@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Code Drop</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      background: #000;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      max-width: 520px;
+      width: 100%;
+    }
+    input {
+      width: 100%;
+      padding: 18px;
+      background: #000;
+      border: 2px solid #fff;
+      color: #fff;
+      font-size: 18px;
+      outline: none;
+      margin-bottom: 30px;
+      box-sizing: border-box;
+    }
+    input:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    h4 {
+      text-align: center;
+      letter-spacing: 2px;
+      margin: 25px 0 15px;
+      font-size: 14px;
+      opacity: 0.8;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .btn {
+      border: 2px solid #fff;
+      padding: 14px;
+      text-align: center;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s;
+    }
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    .btn.active {
+      background: #fff;
+      color: #000;
+    }
+    .btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+    .full {
+      grid-column: span 3;
+    }
+    .status {
+      text-align: right;
+      margin-top: 20px;
+      font-size: 12px;
+    }
+    .status.connected {
+      color: #00ff00;
+    }
+    .status.disconnected {
+      color: #ff0000;
+    }
+    .status.sending {
+      color: #ffff00;
+    }
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 20px;
+      border: 2px solid;
+      background: #000;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 1000;
+    }
+    .notification.show {
+      opacity: 1;
+    }
+    .notification.success {
+      border-color: #00ff00;
+      color: #00ff00;
+    }
+    .notification.error {
+      border-color: #ff0000;
+      color: #ff0000;
+    }
+    .notification.warning {
+      border-color: #ffa500;
+      color: #ffa500;
+    }
+    .connection-indicator {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ff0000;
+      transition: background 0.3s;
+    }
+    .connection-indicator.connected {
+      background: #00ff00;
+      box-shadow: 0 0 10px #00ff00;
+    }
+    .connection-indicator.connecting {
+      background: #ffa500;
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+  </style>
+</head>
+<body>
+<div class="connection-indicator" id="connectionIndicator"></div>
+<div class="container">
+  <!-- CODE INPUT -->
+  <input id="codeInput" placeholder="ENTER CODE" autofocus />
+  <!-- VALUE -->
+  <h4>SELECT VALUE</h4>
+  <div class="grid" id="valueGrid">
+    <div class="btn active">$1</div>
+    <div class="btn">$2</div>
+    <div class="btn">$3</div>
+    <div class="btn">$4</div>
+    <div class="btn">$5</div>
+    <div class="btn">$6.25</div>
+    <div class="btn">$12.50</div>
+    <div class="btn">$25</div>
+    <div class="btn">$50</div>
+    <div class="btn full">NO VALUE</div>
+  </div>
+  <!-- CODE TYPE -->
+  <h4>SELECT CODE TYPE</h4>
+  <div class="grid" id="typeGrid">
+    <div class="btn full active">HIGH ROLLERS</div>
+    <div class="btn full">WEEKLY STREAM</div>
+    <div class="btn full">OTHER DROPS</div>
+  </div>
+  <div class="status disconnected" id="status">CONNECTING…</div>
+</div>
+<div class="notification" id="notification"></div>
+<script>
+  let selectedValue = "$1";
+  let selectedType = "HIGH ROLLERS";
+  let isConnected = false;
+  
+  const SEND_TIMEOUT = 10000; // Timeout for code submission
+  
+  // Initialize socket - let Socket.IO handle reconnection
+  const socket = io(
+    "https://v2-jbgw.onrender.com/ws/ingest",
+    {
+      transports: ["websocket", "polling"], // Websocket first, fallback to polling
+      query: { username: "bharat" },
+      reconnection: true, // Let Socket.IO handle reconnection
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: Infinity,
+      timeout: 20000,
+      forceNew: false,
+      rememberUpgrade: false
+    }
+  );
+  
+  // CONNECTION HANDLERS
+  socket.on("connect", () => {
+    console.log("[CONNECT]", socket.id, new Date().toLocaleTimeString());
+    isConnected = true;
+    updateStatus("CONNECTED", "connected");
+    updateConnectionIndicator("connected");
+    showNotification("Connected", "success");
+  });
+  
+  socket.on("disconnect", (reason) => {
+    console.log("[DISCONNECT]", reason, new Date().toLocaleTimeString());
+    isConnected = false;
+    updateStatus("DISCONNECTED", "disconnected");
+    updateConnectionIndicator("disconnected");
+    
+    // Socket.IO will auto-reconnect - just log the reason
+    if (reason === "io server disconnect") {
+      showNotification("Server closed connection", "error");
+    } else if (reason === "transport error" || reason === "transport close") {
+      showNotification("Connection lost", "error");
+    }
+  });
+  
+  socket.on("reconnect_attempt", (attemptNumber) => {
+    console.log("[RECONNECT_ATTEMPT]", attemptNumber, new Date().toLocaleTimeString());
+    updateStatus(`RECONNECTING (${attemptNumber})...`, "disconnected");
+    updateConnectionIndicator("connecting");
+  });
+  
+  socket.on("reconnect", (attemptNumber) => {
+    console.log("[RECONNECT_SUCCESS]", attemptNumber, new Date().toLocaleTimeString());
+    showNotification("Reconnected!", "success");
+  });
+  
+  socket.on("connect_error", (error) => {
+    console.error("[CONNECT_ERROR]", error.message, new Date().toLocaleTimeString());
+    // Let Socket.IO retry
+  });
+  
+  socket.on("reconnect_failed", () => {
+    console.error("[RECONNECT_FAILED]", new Date().toLocaleTimeString());
+    updateStatus("RECONNECTION FAILED", "disconnected");
+    showNotification("Cannot reconnect - check connection", "error");
+  });
+  
+  // Optional heartbeat for metrics only (no reconnect logic)
+  setInterval(() => {
+    if (socket.connected) {
+      socket.emit("client_heartbeat");
+      console.log("[HEARTBEAT]", new Date().toLocaleTimeString());
+    }
+  }, 30000);
+  
+  // Server pong handler (metrics only)
+  socket.on("server_pong", () => {
+    console.log("[SERVER_PONG]", new Date().toLocaleTimeString());
+  });
+  
+  // Track code acknowledgments
+  socket.on("code_ack", (data) => {
+    console.log("[CODE_ACK]", data);
+  });
+  
+  // STATUS UPDATE
+  function updateStatus(text, className) {
+    const statusEl = document.getElementById("status");
+    statusEl.innerText = text;
+    statusEl.className = `status ${className}`;
+  }
+  
+  function updateConnectionIndicator(state) {
+    const indicator = document.getElementById("connectionIndicator");
+    indicator.className = `connection-indicator ${state}`;
+  }
+  
+  // NOTIFICATION SYSTEM
+  function showNotification(message, type) {
+    const notif = document.getElementById("notification");
+    notif.innerText = message;
+    notif.className = `notification ${type} show`;
+    setTimeout(() => {
+      notif.classList.remove("show");
+    }, 3000);
+  }
+  
+  // BUTTON SELECTION LOGIC
+  function setupGrid(gridId, onSelect) {
+    document.querySelectorAll(`#${gridId} .btn`).forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll(`#${gridId} .btn`)
+          .forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        onSelect(btn.innerText);
+      };
+    });
+  }
+  
+  setupGrid("valueGrid", v => {
+    selectedValue = v === "NO VALUE" ? null : v;
+  });
+  
+  setupGrid("typeGrid", t => {
+    selectedType = t;
+  });
+  
+  // ENTER = SEND
+  document.getElementById("codeInput").addEventListener("keydown", e => {
+    if (e.key === "Enter") sendCode();
+  });
+  
+  function sendCode() {
+    const input = document.getElementById("codeInput");
+    const code = input.value.trim();
+    
+    if (!code) {
+      showNotification("Please enter a code", "error");
+      return;
+    }
+    
+    if (!socket.connected) {
+      showNotification("Not connected - please wait", "error");
+      return;
+    }
+    
+    updateStatus("SENDING…", "sending");
+    input.disabled = true;
+    
+    const payload = {
+      token: "marc_henry",
+      username: "bharat",
+      code: code,
+      source: "web-ui",
+      type: "default",
+      codetype: selectedType.toLowerCase().replace(/ /g, "_"),
+      value: selectedValue,
+      metadata: {
+        timestamp: Date.now()
+      }
+    };
+    
+    let acknowledged = false;
+    
+    // Set timeout for send operation
+    const sendTimeout = setTimeout(() => {
+      if (!acknowledged) {
+        console.error("[SEND] Timeout - no ACK received");
+        showNotification("Send timeout - code may not have been received", "error");
+        updateStatus("CONNECTED", "connected");
+        input.disabled = false;
+        input.focus();
+      }
+    }, SEND_TIMEOUT);
+    
+    try {
+      socket.emit("code", payload, (response) => {
+        acknowledged = true;
+        clearTimeout(sendTimeout);
+        
+        console.log("[SEND] ACK received:", response);
+        showNotification(`Code "${code}" submitted`, "success");
+        input.value = "";
+        updateStatus("CONNECTED", "connected");
+        input.disabled = false;
+        input.focus();
+      });
+      
+    } catch (error) {
+      acknowledged = true;
+      clearTimeout(sendTimeout);
+      console.error("[SEND] Error:", error);
+      showNotification("Failed to send code", "error");
+      updateStatus("CONNECTED", "connected");
+      input.disabled = false;
+      input.focus();
+    }
+  }
+  
+  // Network status handlers
+  window.addEventListener("online", () => {
+    console.log("[NETWORK] Online");
+    showNotification("Internet restored", "success");
+    if (!socket.connected) {
+      socket.connect();
+    }
+  });
+  
+  window.addEventListener("offline", () => {
+    console.log("[NETWORK] Offline");
+    showNotification("No internet connection", "error");
+    updateStatus("OFFLINE", "disconnected");
+    updateConnectionIndicator("disconnected");
+  });
+</script>
+</body>
+</html>
