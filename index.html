@@ -165,21 +165,19 @@
   let selectedType = "HIGH ROLLERS";
   let isConnected = false;
   
-  const SEND_TIMEOUT = 10000; // Timeout for code submission
-  
-  // Initialize socket - let Socket.IO handle reconnection
+  // Initialize socket - WebSocket only for fastest performance
   const socket = io(
     "https://v2-jbgw.onrender.com/ws/ingest",
     {
-      transports: ["websocket", "polling"], // Websocket first, fallback to polling
+      transports: ["websocket"], // WebSocket only - no polling fallback
       query: { username: "bharat" },
-      reconnection: true, // Let Socket.IO handle reconnection
+      reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       reconnectionAttempts: Infinity,
       timeout: 20000,
       forceNew: false,
-      rememberUpgrade: false
+      perMessageDeflate: false // Disable compression for small payloads
     }
   );
   
@@ -241,9 +239,9 @@
     console.log("[SERVER_PONG]", new Date().toLocaleTimeString());
   });
   
-  // Track code acknowledgments
+  // Async confirmation handler (logging only, no UI blocking)
   socket.on("code_ack", (data) => {
-    console.log("[CODE_ACK]", data);
+    console.log("[CODE_ACK] Server confirmed:", data);
   });
   
   // STATUS UPDATE
@@ -297,6 +295,9 @@
     const input = document.getElementById("codeInput");
     const code = input.value.trim();
     
+    // Prevent double-send without delays
+    if (input.disabled) return;
+    
     if (!code) {
       showNotification("Please enter a code", "error");
       return;
@@ -307,9 +308,7 @@
       return;
     }
     
-    updateStatus("SENDING…", "sending");
-    input.disabled = true;
-    
+    // Minimal payload - removed unused metadata
     const payload = {
       token: "marc_henry",
       username: "bharat",
@@ -317,47 +316,22 @@
       source: "web-ui",
       type: "default",
       codetype: selectedType.toLowerCase().replace(/ /g, "_"),
-      value: selectedValue,
-      metadata: {
-        timestamp: Date.now()
-      }
+      value: selectedValue
     };
     
-    let acknowledged = false;
+    // Brief disable to prevent spam (only 1 JS tick)
+    input.disabled = true;
     
-    // Set timeout for send operation
-    const sendTimeout = setTimeout(() => {
-      if (!acknowledged) {
-        console.error("[SEND] Timeout - no ACK received");
-        showNotification("Send timeout - code may not have been received", "error");
-        updateStatus("CONNECTED", "connected");
-        input.disabled = false;
-        input.focus();
-      }
-    }, SEND_TIMEOUT);
+    // Send immediately - no waiting for ACK
+    socket.emit("code", payload);
     
-    try {
-      socket.emit("code", payload, (response) => {
-        acknowledged = true;
-        clearTimeout(sendTimeout);
-        
-        console.log("[SEND] ACK received:", response);
-        showNotification(`Code "${code}" submitted`, "success");
-        input.value = "";
-        updateStatus("CONNECTED", "connected");
-        input.disabled = false;
-        input.focus();
-      });
-      
-    } catch (error) {
-      acknowledged = true;
-      clearTimeout(sendTimeout);
-      console.error("[SEND] Error:", error);
-      showNotification("Failed to send code", "error");
-      updateStatus("CONNECTED", "connected");
-      input.disabled = false;
-      input.focus();
-    }
+    // IMMEDIATELY reset UI (instant feedback)
+    input.value = "";
+    input.disabled = false;
+    input.focus();
+    showNotification(`Code "${code}" sent`, "success");
+    
+    console.log("[SEND]", payload, new Date().toLocaleTimeString());
   }
   
   // Network status handlers
