@@ -562,6 +562,7 @@
 
     /* ─── MOBILE VIEWS ─── */
     .mobile-view { display: none; }
+    .mobile-logs-view { display: none; } /* hidden on desktop */
 
     /* ─── RESPONSIVE ─── */
     @media (max-width: 720px) {
@@ -586,7 +587,7 @@
         display: block;
         padding: 0 16px;
         padding-bottom: calc(72px + env(safe-area-inset-bottom));
-        padding-top: 16px;
+        padding-top: 0;
         overflow-y: auto;
         min-height: 100dvh;
       }
@@ -594,15 +595,44 @@
       .mobile-view.active { display: block; }
       .mobile-view:not(.active) { display: none; }
 
-      .app-header { margin-bottom: 20px; }
+      /* Sticky input card at very top */
+      .mobile-input-sticky {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: var(--bg);
+        padding: 16px 0 10px;
+        margin: 0 0 0;
+      }
+      .mobile-input-sticky .card {
+        margin-bottom: 0;
+        cursor: pointer;
+      }
+      /* Make entire input card tap area large */
+      .mobile-input-sticky .card label {
+        display: block;
+        cursor: pointer;
+      }
+      .mobile-input-sticky #codeInputMobile {
+        font-size: 16px;
+        padding: 18px 52px 18px 18px;
+        letter-spacing: 2px;
+      }
+      .mobile-input-sticky .send-btn {
+        width: 42px;
+        height: 42px;
+        right: 10px;
+        bottom: 10px;
+      }
+      /* Rest of cards scroll below */
+      .mobile-scroll-body {
+        padding-top: 10px;
+      }
+
+      .app-header { margin-bottom: 12px; padding-top: 16px; }
       .app-title { font-size: 11px; }
 
       .card { padding: 16px; margin-bottom: 10px; }
-
-      #codeInput {
-        font-size: 16px; /* Prevents zoom on iOS */
-        padding: 14px 48px 14px 16px;
-      }
 
       .btn { padding: 14px 8px; font-size: 13px; }
       .type-btn { padding: 14px 16px; font-size: 12px; }
@@ -733,73 +763,76 @@
 
 <!-- MOBILE: MAIN VIEW -->
 <div class="mobile-view active" id="mobileMainView">
-  <div class="app-header">
-    <div class="app-title">CODE <span>DROP</span></div>
-    <div class="conn-badge disconnected" id="connBadgeMobile">
-      <div class="conn-dot"></div>
-      <span id="connTextMobile">CONNECTING</span>
-    </div>
-  </div>
-
-  <!-- INPUT -->
-  <div class="card">
-    <span class="input-label">Enter Code</span>
-    <div class="input-wrap">
-      <input id="codeInputMobile" placeholder="PASTE OR TYPE CODE…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
-      <button class="send-btn" onclick="sendCodeMobile()" title="Send">
-        <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-      </button>
-    </div>
-  </div>
-
-  <!-- AUTO COPY -->
-  <div class="card">
-    <div class="toggle-row" id="copyToggleMobile" onclick="toggleAutoCopy()">
-      <span class="toggle-icon">📋</span>
-      <div class="toggle-text">
-        <div class="toggle-title">Auto Copy</div>
-        <div class="toggle-desc">Copies the code to clipboard when sent</div>
+  <div class="mobile-input-sticky">
+    <div class="app-header">
+      <div class="app-title">CODE <span>DROP</span></div>
+      <div class="conn-badge disconnected" id="connBadgeMobile">
+        <div class="conn-dot"></div>
+        <span id="connTextMobile">CONNECTING</span>
       </div>
-      <div class="switch"></div>
     </div>
-  </div>
-
-  <!-- MOBILE LOWERCASE -->
-  <div class="card">
-    <div class="toggle-row" id="lowercaseToggleMobile" onclick="toggleMobileLowercase()">
-      <span class="toggle-icon">🔡</span>
-      <div class="toggle-text">
-        <div class="toggle-title">Mobile Lowercase</div>
-        <div class="toggle-desc">Auto-lowercases input (fixes mobile auto-capitalize)</div>
+    <!-- INPUT — full card is a label so tapping anywhere focuses input -->
+    <div class="card" onclick="document.getElementById('codeInputMobile').focus()">
+      <label class="input-label" for="codeInputMobile">Enter Code</label>
+      <div class="input-wrap">
+        <input id="codeInputMobile" placeholder="PASTE OR TYPE CODE…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+        <button class="send-btn" onclick="event.stopPropagation();sendCodeMobile()" title="Send">
+          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
       </div>
-      <div class="switch"></div>
     </div>
   </div>
 
-  <!-- VALUE -->
-  <div class="card">
-    <span class="section-label">Select Value</span>
-    <div class="grid" id="valueGridMobile">
-      <div class="btn">$1</div>
-      <div class="btn">$2</div>
-      <div class="btn">$3</div>
-      <div class="btn">$4</div>
-      <div class="btn">$5</div>
-      <div class="btn">$6.25</div>
-      <div class="btn">$12.50</div>
-      <div class="btn">$25</div>
-      <div class="btn">$50</div>
-      <div class="btn full active">NO VALUE</div>
+  <div class="mobile-scroll-body">
+    <!-- AUTO COPY -->
+    <div class="card">
+      <div class="toggle-row" id="copyToggleMobile" onclick="toggleAutoCopy()">
+        <span class="toggle-icon">📋</span>
+        <div class="toggle-text">
+          <div class="toggle-title">Auto Copy</div>
+          <div class="toggle-desc">Copies the code to clipboard when sent</div>
+        </div>
+        <div class="switch"></div>
+      </div>
     </div>
-  </div>
 
-  <!-- TYPE -->
-  <div class="card">
-    <span class="section-label">Code Type</span>
-    <div class="type-grid" id="typeGridMobile">
-      <div class="type-btn active"><span class="dot"></span>HIGH ROLLERS</div>
-      <div class="type-btn"><span class="dot"></span>WEEKLY STREAM</div>
-      <div class="type-btn"><span class="dot"></span>OTHER DROPS</div>
+    <!-- MOBILE LOWERCASE -->
+    <div class="card">
+      <div class="toggle-row" id="lowercaseToggleMobile" onclick="toggleMobileLowercase()">
+        <span class="toggle-icon">🔡</span>
+        <div class="toggle-text">
+          <div class="toggle-title">Mobile Lowercase</div>
+          <div class="toggle-desc">Auto-lowercases input (fixes mobile auto-capitalize)</div>
+        </div>
+        <div class="switch"></div>
+      </div>
+    </div>
+
+    <!-- VALUE -->
+    <div class="card">
+      <span class="section-label">Select Value</span>
+      <div class="grid" id="valueGridMobile">
+        <div class="btn">$1</div>
+        <div class="btn">$2</div>
+        <div class="btn">$3</div>
+        <div class="btn">$4</div>
+        <div class="btn">$5</div>
+        <div class="btn">$6.25</div>
+        <div class="btn">$12.50</div>
+        <div class="btn">$25</div>
+        <div class="btn">$50</div>
+        <div class="btn full active">NO VALUE</div>
+      </div>
+    </div>
+
+    <!-- TYPE -->
+    <div class="card">
+      <span class="section-label">Code Type</span>
+      <div class="type-grid" id="typeGridMobile">
+        <div class="type-btn active"><span class="dot"></span>HIGH ROLLERS</div>
+        <div class="type-btn"><span class="dot"></span>WEEKLY STREAM</div>
+        <div class="type-btn"><span class="dot"></span>OTHER DROPS</div>
+      </div>
     </div>
   </div>
 </div>
