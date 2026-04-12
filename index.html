@@ -4,177 +4,380 @@
   <title>Code Drop</title>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-
     :root {
-      --bg: #080808;
-      --surface: #111111;
-      --surface2: #181818;
-      --border: rgba(255,255,255,0.1);
+      --bg: #060608;
+      --surface: #0e0e12;
+      --surface2: #16161c;
+      --surface3: #1c1c24;
+      --border: rgba(255,255,255,0.07);
+      --border-mid: rgba(255,255,255,0.14);
       --border-active: rgba(255,255,255,0.8);
-      --accent: #e2e2e2;
-      --green: #22c55e;
-      --red: #ef4444;
-      --orange: #f97316;
-      --yellow: #eab308;
-      --text-muted: rgba(255,255,255,0.35);
-      --text-dim: rgba(255,255,255,0.6);
+      --green: #00e57a;
+      --green-dim: rgba(0,229,122,0.15);
+      --red: #ff4d6a;
+      --orange: #ff8c42;
+      --yellow: #ffd166;
+      --blue: #5b8fff;
+      --text: #f0f0f8;
+      --text-dim: rgba(240,240,248,0.55);
+      --text-muted: rgba(240,240,248,0.28);
+      --radius: 12px;
+      --radius-sm: 8px;
     }
 
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       background: var(--bg);
-      color: #fff;
-      font-family: 'Inter', sans-serif;
-      display: flex;
-      justify-content: center;
-      padding: 36px 24px;
-      gap: 28px;
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
       min-height: 100vh;
-      background-image: radial-gradient(ellipse at 20% 0%, rgba(255,255,255,0.025) 0%, transparent 60%);
+      min-height: 100dvh;
+      background-image:
+        radial-gradient(ellipse 80% 40% at 10% -10%, rgba(0,229,122,0.04) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 90% 100%, rgba(91,143,255,0.04) 0%, transparent 60%);
     }
 
-    /* ── MAIN CONTAINER ── */
-    .container {
-      max-width: 480px;
-      width: 100%;
+    /* ─── DESKTOP LAYOUT ─── */
+    .app-layout {
+      display: flex;
+      gap: 20px;
+      padding: 32px 32px 32px 32px;
+      max-width: 960px;
+      margin: 0 auto;
+      min-height: 100vh;
+    }
+
+    .main-col {
+      flex: 1;
+      min-width: 0;
+      max-width: 500px;
+    }
+
+    .logs-col {
+      width: 300px;
       flex-shrink: 0;
     }
 
-    input {
-      width: 100%;
-      padding: 16px 20px;
-      background: var(--surface);
-      border: 1.5px solid var(--border);
-      border-radius: 10px;
-      color: #fff;
-      font-size: 17px;
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 500;
-      letter-spacing: 2px;
-      outline: none;
+    /* ─── HEADER ─── */
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       margin-bottom: 28px;
-      transition: border-color 0.2s, box-shadow 0.2s;
     }
-    input::placeholder { color: var(--text-muted); letter-spacing: 1px; font-size: 14px; }
-    input:focus {
-      border-color: rgba(255,255,255,0.5);
-      box-shadow: 0 0 0 3px rgba(255,255,255,0.05), 0 0 20px rgba(255,255,255,0.04);
-    }
-    input:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    h4 {
-      text-align: center;
+    .app-title {
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
       letter-spacing: 3px;
-      margin: 24px 0 12px;
-      font-size: 10px;
-      font-weight: 600;
-      color: var(--text-muted);
       text-transform: uppercase;
-      position: relative;
+      color: var(--text-dim);
     }
-    h4::before, h4::after {
+
+    .app-title span {
+      color: var(--green);
+    }
+
+    .conn-badge {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 12px 5px 9px;
+      background: var(--surface);
+      border: 1px solid var(--border-mid);
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      transition: all 0.3s;
+    }
+
+    .conn-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--red);
+      transition: background 0.3s, box-shadow 0.3s;
+      flex-shrink: 0;
+    }
+
+    .conn-badge.connected { color: var(--green); border-color: rgba(0,229,122,0.25); }
+    .conn-badge.connected .conn-dot {
+      background: var(--green);
+      box-shadow: 0 0 0 3px rgba(0,229,122,0.2), 0 0 8px rgba(0,229,122,0.5);
+    }
+    .conn-badge.disconnected .conn-dot { background: var(--red); }
+    .conn-badge.connecting .conn-dot {
+      background: var(--orange);
+      animation: blink 1s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+    /* ─── CARD ─── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border-mid);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 14px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
       content: '';
       position: absolute;
-      top: 50%;
-      width: 28%;
+      top: 0; left: 0; right: 0;
       height: 1px;
-      background: var(--border);
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
     }
-    h4::before { left: 0; }
-    h4::after { right: 0; }
 
+    /* ─── CODE INPUT ─── */
+    .input-wrap {
+      position: relative;
+    }
+
+    .input-label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      display: block;
+    }
+
+    #codeInput {
+      width: 100%;
+      padding: 15px 50px 15px 18px;
+      background: var(--surface2);
+      border: 1.5px solid var(--border-mid);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 18px;
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      letter-spacing: 3px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      -webkit-appearance: none;
+    }
+    #codeInput::placeholder {
+      color: var(--text-muted);
+      letter-spacing: 1px;
+      font-size: 13px;
+      font-weight: 400;
+    }
+    #codeInput:focus {
+      border-color: rgba(0,229,122,0.4);
+      box-shadow: 0 0 0 3px rgba(0,229,122,0.07), 0 0 20px rgba(0,229,122,0.05);
+    }
+    #codeInput:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .send-btn {
+      position: absolute;
+      right: 8px;
+      bottom: 8px;
+      width: 36px;
+      height: 36px;
+      background: var(--green);
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      color: #000;
+    }
+    .send-btn:hover { background: #00ff88; transform: scale(1.05); }
+    .send-btn:active { transform: scale(0.95); }
+    .send-btn svg { width: 16px; height: 16px; fill: currentColor; }
+
+    /* ─── SECTION DIVIDER ─── */
+    .section-label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      display: block;
+    }
+
+    /* ─── GRID BUTTONS ─── */
     .grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
+      gap: 7px;
     }
 
     .btn {
-      background: var(--surface);
+      background: var(--surface2);
       border: 1.5px solid var(--border);
-      border-radius: 8px;
-      padding: 13px 10px;
+      border-radius: var(--radius-sm);
+      padding: 12px 8px;
       text-align: center;
       cursor: pointer;
       user-select: none;
-      font-size: 13px;
-      font-weight: 500;
-      font-family: 'Inter', sans-serif;
-      color: var(--text-dim);
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Space Grotesk', sans-serif;
+      color: var(--text-muted);
       transition: all 0.15s ease;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.3px;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
     .btn:hover {
-      background: var(--surface2);
-      border-color: rgba(255,255,255,0.25);
-      color: #fff;
+      background: var(--surface3);
+      border-color: var(--border-mid);
+      color: var(--text-dim);
     }
     .btn.active {
-      background: #fff;
-      border-color: #fff;
-      color: #000;
+      background: var(--green-dim);
+      border-color: rgba(0,229,122,0.45);
+      color: var(--green);
       font-weight: 700;
-      box-shadow: 0 0 16px rgba(255,255,255,0.12);
     }
-    .full { grid-column: span 3; }
+    .btn.full { grid-column: span 3; }
 
-    .status {
-      text-align: right;
-      margin-top: 20px;
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-    }
-    .status.connected { color: var(--green); }
-    .status.disconnected { color: var(--red); }
-    .status.sending { color: var(--yellow); }
-
-    /* ── LOGS PANEL ── */
-    .logs-panel {
-      width: 320px;
-      flex-shrink: 0;
+    /* ─── TYPE BUTTONS ─── */
+    .type-grid {
       display: flex;
       flex-direction: column;
-      background: var(--surface);
+      gap: 7px;
+    }
+
+    .type-btn {
+      background: var(--surface2);
       border: 1.5px solid var(--border);
-      border-radius: 14px;
-      padding: 18px 16px;
-      height: fit-content;
-      max-height: calc(100vh - 72px);
+      border-radius: var(--radius-sm);
+      padding: 13px 16px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Space Grotesk', sans-serif;
+      color: var(--text-muted);
+      transition: all 0.15s ease;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .type-btn .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--border-mid);
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .type-btn:hover { background: var(--surface3); border-color: var(--border-mid); color: var(--text-dim); }
+    .type-btn.active {
+      background: var(--green-dim);
+      border-color: rgba(0,229,122,0.4);
+      color: var(--green);
+    }
+    .type-btn.active .dot { background: var(--green); box-shadow: 0 0 6px rgba(0,229,122,0.6); }
+
+    /* ─── AUTO COPY TOGGLE ─── */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .toggle-icon { font-size: 18px; flex-shrink: 0; }
+    .toggle-text { flex: 1; }
+    .toggle-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-dim);
+      letter-spacing: 0.3px;
+      transition: color 0.2s;
+    }
+    .toggle-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .toggle-row.enabled .toggle-title { color: var(--green); }
+
+    .switch {
+      width: 40px;
+      height: 22px;
+      background: var(--surface3);
+      border: 1.5px solid var(--border-mid);
+      border-radius: 999px;
+      position: relative;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .switch::after {
+      content: '';
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 13px; height: 13px;
+      background: var(--text-muted);
+      border-radius: 50%;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .toggle-row.enabled .switch { background: var(--green); border-color: var(--green); }
+    .toggle-row.enabled .switch::after { transform: translateX(18px); background: #000; }
+
+    /* ─── LOGS PANEL ─── */
+    .logs-panel {
+      background: var(--surface);
+      border: 1px solid var(--border-mid);
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 100px);
       position: sticky;
-      top: 36px;
+      top: 32px;
+      overflow: hidden;
     }
 
     .logs-header {
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      gap: 8px;
+      padding: 14px 16px;
       border-bottom: 1px solid var(--border);
-      padding-bottom: 12px;
-      margin-bottom: 14px;
+      flex-shrink: 0;
     }
     .logs-title {
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 700;
       letter-spacing: 2.5px;
       color: var(--text-dim);
       text-transform: uppercase;
+      flex: 1;
     }
     .logs-count {
-      font-size: 10px;
-      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      font-family: 'Space Mono', monospace;
       color: var(--text-muted);
       background: var(--surface2);
       padding: 2px 8px;
-      border-radius: 20px;
+      border-radius: 999px;
     }
     .logs-clear {
-      font-size: 10px;
-      font-weight: 600;
+      font-size: 9px;
+      font-weight: 700;
       letter-spacing: 1px;
       color: var(--text-muted);
       cursor: pointer;
@@ -184,293 +387,561 @@
       transition: all 0.2s;
       text-transform: uppercase;
     }
-    .logs-clear:hover { color: var(--red); border-color: var(--red); background: rgba(239,68,68,0.07); }
+    .logs-clear:hover { color: var(--red); border-color: var(--red); background: rgba(255,77,106,0.07); }
 
-    .logs-list {
+    .logs-body {
       flex: 1;
       overflow-y: auto;
+      padding: 10px;
       display: flex;
       flex-direction: column;
-      gap: 7px;
-      max-height: calc(100vh - 180px);
+      gap: 6px;
       scrollbar-width: thin;
       scrollbar-color: #222 transparent;
-      padding-right: 2px;
     }
-    .logs-list::-webkit-scrollbar { width: 3px; }
-    .logs-list::-webkit-scrollbar-track { background: transparent; }
-    .logs-list::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+    .logs-body::-webkit-scrollbar { width: 3px; }
+    .logs-body::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
 
     .log-entry {
       background: var(--bg);
       border: 1px solid var(--border);
-      border-left: 2.5px solid rgba(34,197,94,0.5);
-      border-radius: 8px;
-      padding: 9px 12px;
-      font-size: 11px;
-      line-height: 1.6;
+      border-left: 2px solid rgba(0,229,122,0.4);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
       animation: slideIn 0.18s ease;
       position: relative;
+      cursor: pointer;
       transition: border-color 0.15s, background 0.15s;
     }
     .log-entry:hover {
-      border-color: rgba(255,255,255,0.2);
+      border-color: var(--border-mid);
       border-left-color: var(--green);
-      background: rgba(255,255,255,0.02);
+      background: rgba(0,229,122,0.03);
+    }
+    .log-entry:active { transform: scale(0.985); }
+    .log-entry.copied {
+      border-color: rgba(0,229,122,0.5);
+      border-left-color: var(--green);
+      background: rgba(0,229,122,0.06);
+    }
+    .log-copy-hint {
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-top: 5px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .log-entry:hover .log-copy-hint { opacity: 1; }
+    .log-entry.copied .log-copy-hint {
+      opacity: 1;
+      color: var(--green);
+      content: "COPIED!";
     }
     @keyframes slideIn {
-      from { opacity: 0; transform: translateY(-6px) scale(0.98); }
-      to   { opacity: 1; transform: translateY(0) scale(1); }
+      from { opacity: 0; transform: translateY(-5px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
-    .log-index {
+    .log-num {
       position: absolute;
-      top: 9px;
-      right: 10px;
-      color: var(--text-muted);
+      top: 8px; right: 9px;
       font-size: 9px;
-      font-family: 'JetBrains Mono', monospace;
+      font-family: 'Space Mono', monospace;
+      color: var(--text-muted);
     }
     .log-time {
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
       color: var(--green);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
+      opacity: 0.7;
       margin-bottom: 3px;
-      opacity: 0.85;
     }
     .log-code {
+      font-family: 'Space Mono', monospace;
       font-size: 13px;
       font-weight: 700;
-      font-family: 'JetBrains Mono', monospace;
+      color: var(--text);
       letter-spacing: 1px;
-      color: #fff;
-      margin-bottom: 3px;
+      margin-bottom: 2px;
     }
     .log-meta {
-      color: var(--text-muted);
       font-size: 10px;
+      color: var(--text-muted);
       font-weight: 500;
-      letter-spacing: 0.3px;
     }
     .log-empty {
       color: var(--text-muted);
       font-size: 11px;
       text-align: center;
-      margin-top: 50px;
+      padding: 48px 0;
       letter-spacing: 2px;
       text-transform: uppercase;
-      line-height: 2;
+      line-height: 2.5;
     }
+    .log-empty-icon { font-size: 28px; display: block; margin-bottom: 8px; opacity: 0.4; }
 
-    /* ── AUTO COPY TOGGLE ── */
-    .copy-toggle {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 28px;
-      padding: 12px 16px;
-      background: var(--surface);
-      border: 1.5px solid var(--border);
-      border-radius: 10px;
-      cursor: pointer;
-      user-select: none;
-      transition: border-color 0.2s, background 0.2s;
-    }
-    .copy-toggle:hover { border-color: rgba(255,255,255,0.25); }
-    .copy-toggle.enabled {
-      border-color: rgba(34,197,94,0.5);
-      background: rgba(34,197,94,0.06);
-    }
-    .copy-toggle-icon {
-      font-size: 15px;
-      line-height: 1;
-      flex-shrink: 0;
-    }
-    .copy-toggle-label {
-      flex: 1;
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 1px;
-      color: var(--text-dim);
-      text-transform: uppercase;
-    }
-    .copy-toggle.enabled .copy-toggle-label { color: var(--green); }
-    .copy-toggle-desc {
-      font-size: 10px;
-      color: var(--text-muted);
-      font-weight: 400;
-      letter-spacing: 0;
-      text-transform: none;
-      display: block;
-      margin-top: 1px;
-    }
-    .copy-toggle-switch {
-      width: 36px;
-      height: 20px;
-      background: var(--surface2);
-      border: 1.5px solid var(--border);
-      border-radius: 999px;
-      position: relative;
-      transition: background 0.2s, border-color 0.2s;
-      flex-shrink: 0;
-    }
-    .copy-toggle.enabled .copy-toggle-switch {
-      background: var(--green);
-      border-color: var(--green);
-    }
-    .copy-toggle-switch::after {
-      content: '';
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 12px;
-      height: 12px;
-      background: var(--text-muted);
-      border-radius: 50%;
-      transition: transform 0.2s, background 0.2s;
-    }
-    .copy-toggle.enabled .copy-toggle-switch::after {
-      transform: translateX(16px);
-      background: #000;
-    }
-
-    /* ── NOTIFICATIONS ── */
+    /* ─── NOTIFICATION ─── */
     .notification {
       position: fixed;
-      top: 24px;
-      right: 24px;
-      padding: 12px 18px;
-      border-radius: 10px;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      padding: 11px 20px;
+      border-radius: 999px;
       border: 1px solid;
-      background: var(--surface);
+      background: var(--surface2);
       font-size: 12px;
       font-weight: 600;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.3px;
       opacity: 0;
       transition: opacity 0.25s, transform 0.25s;
       pointer-events: none;
       z-index: 1000;
-      transform: translateY(-6px);
-      box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+      white-space: nowrap;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.6);
     }
-    .notification.show { opacity: 1; transform: translateY(0); }
-    .notification.success { border-color: var(--green); color: var(--green); }
-    .notification.error   { border-color: var(--red);   color: var(--red); }
-    .notification.warning { border-color: var(--orange); color: var(--orange); }
+    .notification.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .notification.success { border-color: rgba(0,229,122,0.4); color: var(--green); }
+    .notification.error   { border-color: rgba(255,77,106,0.4); color: var(--red); }
+    .notification.warning { border-color: rgba(255,140,66,0.4); color: var(--orange); }
 
-    /* ── CONNECTION DOT ── */
-    .connection-indicator {
+    /* ─── MOBILE BOTTOM TABS ─── */
+    .mobile-tabs {
+      display: none;
       position: fixed;
-      top: 24px;
-      left: 24px;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: var(--red);
-      transition: background 0.3s, box-shadow 0.3s;
+      bottom: 0; left: 0; right: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border-mid);
+      z-index: 100;
+      backdrop-filter: blur(20px);
     }
-    .connection-indicator.connected {
+    .tab-bar {
+      display: flex;
+      align-items: center;
+      padding: 8px 16px;
+      padding-bottom: max(8px, env(safe-area-inset-bottom));
+      gap: 4px;
+    }
+    .tab-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 4px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+      border: none;
+      background: none;
+    }
+    .tab-btn svg { width: 20px; height: 20px; }
+    .tab-btn.active { color: var(--green); }
+    .tab-icon { position: relative; }
+    .tab-badge {
+      position: absolute;
+      top: -4px; right: -6px;
       background: var(--green);
-      box-shadow: 0 0 0 3px rgba(34,197,94,0.2), 0 0 12px rgba(34,197,94,0.5);
+      color: #000;
+      font-size: 8px;
+      font-weight: 800;
+      width: 15px; height: 15px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
-    .connection-indicator.connecting {
-      background: var(--orange);
-      animation: pulse 1s infinite;
+
+    /* ─── MOBILE VIEWS ─── */
+    .mobile-view { display: none; }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 720px) {
+      .app-layout {
+        padding: 0;
+        display: block;
+        max-width: 100%;
+        min-height: 100dvh;
+        position: relative;
+      }
+
+      .logs-col { display: none; }
+
+      .mobile-tabs { display: block; }
+
+      .main-col {
+        max-width: 100%;
+        display: none;
+      }
+
+      .mobile-view {
+        display: block;
+        padding: 0 16px;
+        padding-bottom: calc(72px + env(safe-area-inset-bottom));
+        padding-top: 16px;
+        overflow-y: auto;
+        min-height: 100dvh;
+      }
+
+      .mobile-view.active { display: block; }
+      .mobile-view:not(.active) { display: none; }
+
+      .app-header { margin-bottom: 20px; }
+      .app-title { font-size: 11px; }
+
+      .card { padding: 16px; margin-bottom: 10px; }
+
+      #codeInput {
+        font-size: 16px; /* Prevents zoom on iOS */
+        padding: 14px 48px 14px 16px;
+      }
+
+      .btn { padding: 14px 8px; font-size: 13px; }
+      .type-btn { padding: 14px 16px; font-size: 12px; }
+
+      /* Mobile logs panel */
+      .mobile-logs-view {
+        display: none;
+        padding: 16px 16px;
+        padding-bottom: calc(72px + env(safe-area-inset-bottom));
+        min-height: 100dvh;
+      }
+      .mobile-logs-view.active { display: block; }
+
+      .mobile-logs-panel {
+        background: var(--surface);
+        border: 1px solid var(--border-mid);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+
+      .notification {
+        bottom: calc(72px + 12px + env(safe-area-inset-bottom));
+      }
     }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
+
+    @media (max-width: 480px) {
+      .grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
     }
   </style>
 </head>
 <body>
-<div class="connection-indicator" id="connectionIndicator"></div>
-<div class="container">
-  <!-- CODE INPUT -->
-  <input id="codeInput" placeholder="ENTER CODE" autofocus />
-  <!-- AUTO COPY TOGGLE -->
-  <div class="copy-toggle" id="copyToggle" onclick="toggleAutoCopy()">
-    <span class="copy-toggle-icon">📋</span>
-    <span class="copy-toggle-label">
-      Auto Copy
-      <span class="copy-toggle-desc">Copies the code to clipboard when sent</span>
-    </span>
-    <div class="copy-toggle-switch"></div>
+
+<!-- ═══════════════ DESKTOP LAYOUT ═══════════════ -->
+<div class="app-layout">
+
+  <!-- MAIN COLUMN -->
+  <div class="main-col" id="desktopMain">
+    <div class="app-header">
+      <div class="app-title">CODE <span>DROP</span></div>
+      <div class="conn-badge disconnected" id="connBadgeDesktop">
+        <div class="conn-dot"></div>
+        <span id="connTextDesktop">CONNECTING</span>
+      </div>
+    </div>
+
+    <!-- INPUT CARD -->
+    <div class="card">
+      <span class="input-label">Enter Code</span>
+      <div class="input-wrap">
+        <input id="codeInput" placeholder="PASTE OR TYPE CODE…" autofocus autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+        <button class="send-btn" onclick="sendCode()" title="Send (Enter)">
+          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- AUTO COPY CARD -->
+    <div class="card">
+      <div class="toggle-row" id="copyToggle" onclick="toggleAutoCopy()">
+        <span class="toggle-icon">📋</span>
+        <div class="toggle-text">
+          <div class="toggle-title">Auto Copy</div>
+          <div class="toggle-desc">Copies the code to clipboard when sent</div>
+        </div>
+        <div class="switch"></div>
+      </div>
+    </div>
+
+    <!-- MOBILE LOWERCASE CARD -->
+    <div class="card">
+      <div class="toggle-row" id="lowercaseToggle" onclick="toggleMobileLowercase()">
+        <span class="toggle-icon">🔡</span>
+        <div class="toggle-text">
+          <div class="toggle-title">Mobile Lowercase</div>
+          <div class="toggle-desc">Auto-lowercases input (fixes mobile auto-capitalize)</div>
+        </div>
+        <div class="switch"></div>
+      </div>
+    </div>
+
+    <!-- VALUE CARD -->
+    <div class="card">
+      <span class="section-label">Select Value</span>
+      <div class="grid" id="valueGrid">
+        <div class="btn">$1</div>
+        <div class="btn">$2</div>
+        <div class="btn">$3</div>
+        <div class="btn">$4</div>
+        <div class="btn">$5</div>
+        <div class="btn">$6.25</div>
+        <div class="btn">$12.50</div>
+        <div class="btn">$25</div>
+        <div class="btn">$50</div>
+        <div class="btn full active">NO VALUE</div>
+      </div>
+    </div>
+
+    <!-- TYPE CARD -->
+    <div class="card">
+      <span class="section-label">Code Type</span>
+      <div class="type-grid" id="typeGrid">
+        <div class="type-btn active"><span class="dot"></span>HIGH ROLLERS</div>
+        <div class="type-btn"><span class="dot"></span>WEEKLY STREAM</div>
+        <div class="type-btn"><span class="dot"></span>OTHER DROPS</div>
+      </div>
+    </div>
   </div>
-  <!-- VALUE -->
-  <h4>SELECT VALUE</h4>
-  <div class="grid" id="valueGrid">
-    <div class="btn active">$1</div>
-    <div class="btn">$2</div>
-    <div class="btn">$3</div>
-    <div class="btn">$4</div>
-    <div class="btn">$5</div>
-    <div class="btn">$6.25</div>
-    <div class="btn">$12.50</div>
-    <div class="btn">$25</div>
-    <div class="btn">$50</div>
-    <div class="btn full">NO VALUE</div>
+
+  <!-- LOGS COLUMN (desktop) -->
+  <div class="logs-col">
+    <div class="logs-panel">
+      <div class="logs-header">
+        <span class="logs-title">Send Log</span>
+        <span class="logs-count" id="logsCountDesktop">0 / 50</span>
+        <span class="logs-clear" onclick="clearLogs()">Clear</span>
+      </div>
+      <div class="logs-body" id="logsListDesktop">
+        <div class="log-empty">
+          <span class="log-empty-icon">📭</span>
+          NO CODES SENT YET
+        </div>
+      </div>
+    </div>
   </div>
-  <!-- CODE TYPE -->
-  <h4>SELECT CODE TYPE</h4>
-  <div class="grid" id="typeGrid">
-    <div class="btn full active">HIGH ROLLERS</div>
-    <div class="btn full">WEEKLY STREAM</div>
-    <div class="btn full">OTHER DROPS</div>
-  </div>
-  <div class="status disconnected" id="status">CONNECTING…</div>
 </div>
 
-<!-- LOGS PANEL -->
-<div class="logs-panel">
-  <div class="logs-header">
-    <span class="logs-title">SEND LOG</span>
-    <span class="logs-count" id="logsCount">0 / 50</span>
-    <span class="logs-clear" onclick="clearLogs()">CLEAR</span>
+<!-- ═══════════════ MOBILE LAYOUT ═══════════════ -->
+
+<!-- MOBILE: MAIN VIEW -->
+<div class="mobile-view active" id="mobileMainView">
+  <div class="app-header">
+    <div class="app-title">CODE <span>DROP</span></div>
+    <div class="conn-badge disconnected" id="connBadgeMobile">
+      <div class="conn-dot"></div>
+      <span id="connTextMobile">CONNECTING</span>
+    </div>
   </div>
-  <div class="logs-list" id="logsList">
-    <div class="log-empty" id="logsEmpty">NO CODES SENT YET</div>
+
+  <!-- INPUT -->
+  <div class="card">
+    <span class="input-label">Enter Code</span>
+    <div class="input-wrap">
+      <input id="codeInputMobile" placeholder="PASTE OR TYPE CODE…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+      <button class="send-btn" onclick="sendCodeMobile()" title="Send">
+        <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- AUTO COPY -->
+  <div class="card">
+    <div class="toggle-row" id="copyToggleMobile" onclick="toggleAutoCopy()">
+      <span class="toggle-icon">📋</span>
+      <div class="toggle-text">
+        <div class="toggle-title">Auto Copy</div>
+        <div class="toggle-desc">Copies the code to clipboard when sent</div>
+      </div>
+      <div class="switch"></div>
+    </div>
+  </div>
+
+  <!-- MOBILE LOWERCASE -->
+  <div class="card">
+    <div class="toggle-row" id="lowercaseToggleMobile" onclick="toggleMobileLowercase()">
+      <span class="toggle-icon">🔡</span>
+      <div class="toggle-text">
+        <div class="toggle-title">Mobile Lowercase</div>
+        <div class="toggle-desc">Auto-lowercases input (fixes mobile auto-capitalize)</div>
+      </div>
+      <div class="switch"></div>
+    </div>
+  </div>
+
+  <!-- VALUE -->
+  <div class="card">
+    <span class="section-label">Select Value</span>
+    <div class="grid" id="valueGridMobile">
+      <div class="btn">$1</div>
+      <div class="btn">$2</div>
+      <div class="btn">$3</div>
+      <div class="btn">$4</div>
+      <div class="btn">$5</div>
+      <div class="btn">$6.25</div>
+      <div class="btn">$12.50</div>
+      <div class="btn">$25</div>
+      <div class="btn">$50</div>
+      <div class="btn full active">NO VALUE</div>
+    </div>
+  </div>
+
+  <!-- TYPE -->
+  <div class="card">
+    <span class="section-label">Code Type</span>
+    <div class="type-grid" id="typeGridMobile">
+      <div class="type-btn active"><span class="dot"></span>HIGH ROLLERS</div>
+      <div class="type-btn"><span class="dot"></span>WEEKLY STREAM</div>
+      <div class="type-btn"><span class="dot"></span>OTHER DROPS</div>
+    </div>
+  </div>
+</div>
+
+<!-- MOBILE: LOGS VIEW -->
+<div class="mobile-logs-view" id="mobileLogsView">
+  <div class="app-header" style="margin-bottom:16px;">
+    <div class="app-title">SEND <span>LOG</span></div>
+    <span class="logs-clear" onclick="clearLogs()" style="font-size:11px;padding:5px 12px;">Clear All</span>
+  </div>
+  <div class="mobile-logs-panel">
+    <div class="logs-header">
+      <span class="logs-title">History</span>
+      <span class="logs-count" id="logsCountMobile">0 / 50</span>
+    </div>
+    <div class="logs-body" id="logsListMobile" style="max-height:calc(100dvh - 180px);">
+      <div class="log-empty">
+        <span class="log-empty-icon">📭</span>
+        NO CODES SENT YET
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MOBILE BOTTOM TAB BAR -->
+<div class="mobile-tabs">
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tabMain" onclick="switchTab('main')">
+      <div class="tab-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+        </svg>
+      </div>
+      <span>SEND</span>
+    </button>
+    <button class="tab-btn" id="tabLogs" onclick="switchTab('logs')">
+      <div class="tab-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 12h6M9 8h6M9 16h4M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/>
+        </svg>
+        <span class="tab-badge" id="tabBadge" style="display:none">0</span>
+      </div>
+      <span>LOG</span>
+    </button>
   </div>
 </div>
 
 <div class="notification" id="notification"></div>
-<script>
-  let selectedValue = "$1";
-  let selectedType = "HIGH ROLLERS";
-  let isConnected = false;
-  let autoCopy = false;
-  let sentLogs = [];
-  const MAX_LOGS = 50;
 
-  function toggleAutoCopy() {
-    autoCopy = !autoCopy;
-    const el = document.getElementById("copyToggle");
-    el.classList.toggle("enabled", autoCopy);
+<script>
+  // ── STATE ──
+  let selectedValue    = null;       // default: NO VALUE
+  let selectedType     = "HIGH ROLLERS";
+  let isConnected      = false;
+  let autoCopy         = false;
+  let mobileLowercase  = false;      // off by default
+  let sentLogs         = [];
+  const MAX_LOGS       = 50;
+  const isMobile       = () => window.innerWidth <= 720;
+
+  // ── MOBILE TABS ──
+  function switchTab(tab) {
+    const mainView = document.getElementById("mobileMainView");
+    const logsView = document.getElementById("mobileLogsView");
+    const tabMain  = document.getElementById("tabMain");
+    const tabLogs  = document.getElementById("tabLogs");
+    const badge    = document.getElementById("tabBadge");
+
+    if (tab === "main") {
+      mainView.classList.add("active");
+      logsView.classList.remove("active");
+      tabMain.classList.add("active");
+      tabLogs.classList.remove("active");
+    } else {
+      mainView.classList.remove("active");
+      logsView.classList.add("active");
+      tabMain.classList.remove("active");
+      tabLogs.classList.add("active");
+      badge.style.display = "none";
+    }
   }
 
+  // ── AUTO COPY ──
+  function toggleAutoCopy() {
+    autoCopy = !autoCopy;
+    document.getElementById("copyToggle").classList.toggle("enabled", autoCopy);
+    document.getElementById("copyToggleMobile").classList.toggle("enabled", autoCopy);
+  }
+
+  // ── MOBILE LOWERCASE ──
+  function toggleMobileLowercase() {
+    mobileLowercase = !mobileLowercase;
+    document.getElementById("lowercaseToggle").classList.toggle("enabled", mobileLowercase);
+    document.getElementById("lowercaseToggleMobile").classList.toggle("enabled", mobileLowercase);
+  }
+
+  function applyLowercaseIfNeeded(input) {
+    if (!mobileLowercase) return;
+    const pos = input.selectionStart;
+    input.value = input.value.toLowerCase();
+    input.setSelectionRange(pos, pos);
+  }
+
+  // ── LOGS ──
   function addLog(code, value, codetype) {
-    const now = new Date();
+    const now    = new Date();
     const timeStr = now.toTimeString().split(" ")[0];
-    const ms = String(now.getMilliseconds()).padStart(3, "0");
+    const ms      = String(now.getMilliseconds()).padStart(3, "0");
     sentLogs.unshift({ code, value, codetype, time: `${timeStr}.${ms}` });
     if (sentLogs.length > MAX_LOGS) sentLogs.pop();
     renderLogs();
   }
 
   function renderLogs() {
-    const list = document.getElementById("logsList");
-    document.getElementById("logsCount").textContent = `${sentLogs.length} / ${MAX_LOGS}`;
-    if (sentLogs.length === 0) {
-      list.innerHTML = '<div class="log-empty">NO CODES SENT YET</div>';
-      return;
+    const count = sentLogs.length;
+    const countStr = `${count} / ${MAX_LOGS}`;
+    document.getElementById("logsCountDesktop").textContent = countStr;
+    document.getElementById("logsCountMobile").textContent  = countStr;
+
+    const badge = document.getElementById("tabBadge");
+    if (count > 0 && isMobile()) {
+      const logsTab = document.getElementById("tabLogs");
+      if (!logsTab.classList.contains("active")) {
+        badge.style.display = "flex";
+        badge.textContent   = count > 9 ? "9+" : count;
+      }
     }
-    list.innerHTML = sentLogs.map((e, i) => `
-      <div class="log-entry">
-        <span class="log-index">#${sentLogs.length - i}</span>
-        <div class="log-time">&#9201; ${e.time}</div>
-        <div class="log-code">${e.code}</div>
-        <div class="log-meta">${e.codetype.toUpperCase().replace(/_/g, " ")} &nbsp;&middot;&nbsp; ${e.value || "NO VALUE"}</div>
-      </div>
-    `).join("");
+
+    const html = count === 0
+      ? '<div class="log-empty"><span class="log-empty-icon">📭</span>NO CODES SENT YET</div>'
+      : sentLogs.map((e, i) => `
+          <div class="log-entry" onclick="copyLogCode(this, '${e.code.replace(/'/g, "\\'")}')" title="Click to copy code">
+            <span class="log-num">#${count - i}</span>
+            <div class="log-time">⏱ ${e.time}</div>
+            <div class="log-code">${e.code}</div>
+            <div class="log-meta">${e.codetype.toUpperCase().replace(/_/g, " ")} &middot; ${e.value || "NO VALUE"}</div>
+            <div class="log-copy-hint">TAP TO COPY</div>
+          </div>
+        `).join("");
+
+    document.getElementById("logsListDesktop").innerHTML = html;
+    document.getElementById("logsListMobile").innerHTML  = html;
   }
 
   function clearLogs() {
@@ -478,11 +949,153 @@
     renderLogs();
   }
 
-  // Initialize socket - WebSocket only for fastest performance
+  function copyLogCode(el, code) {
+    navigator.clipboard.writeText(code).then(() => {
+      el.classList.add("copied");
+      showNotification(`"${code}" copied!`, "success");
+      setTimeout(() => el.classList.remove("copied"), 1200);
+    }).catch(() => {
+      showNotification("Copy failed", "error");
+    });
+  }
+
+  // ── GRIDS ──
+  function setupGrid(gridId, onSelect) {
+    document.querySelectorAll(`#${gridId} .btn`).forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(`#${gridId} .btn`).forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        onSelect(btn.innerText);
+        // Sync the other grid if it's a mirrored one
+        syncGrids(gridId, btn.innerText);
+      });
+    });
+  }
+
+  function setupTypeGrid(gridId, onSelect) {
+    document.querySelectorAll(`#${gridId} .type-btn`).forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(`#${gridId} .type-btn`).forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        onSelect(btn.innerText.trim());
+        syncTypeGrids(gridId, btn.innerText.trim());
+      });
+    });
+  }
+
+  // Sync value grids between desktop & mobile
+  function syncGrids(sourceId, value) {
+    const otherId = sourceId === "valueGrid" ? "valueGridMobile" : "valueGrid";
+    document.querySelectorAll(`#${otherId} .btn`).forEach(b => {
+      b.classList.toggle("active", b.innerText === value);
+    });
+  }
+
+  function syncTypeGrids(sourceId, value) {
+    const otherId = sourceId === "typeGrid" ? "typeGridMobile" : "typeGrid";
+    document.querySelectorAll(`#${otherId} .type-btn`).forEach(b => {
+      b.classList.toggle("active", b.innerText.trim() === value);
+    });
+  }
+
+  setupGrid("valueGrid",       v => { selectedValue = v === "NO VALUE" ? null : v; });
+  setupGrid("valueGridMobile", v => { selectedValue = v === "NO VALUE" ? null : v; });
+  setupTypeGrid("typeGrid",       t => { selectedType = t; });
+  setupTypeGrid("typeGridMobile", t => { selectedType = t; });
+
+  // ── ENTER KEY (desktop) ──
+  document.getElementById("codeInput").addEventListener("keydown", e => {
+    if (e.key === "Enter") sendCode();
+  });
+  document.getElementById("codeInput").addEventListener("input", e => {
+    applyLowercaseIfNeeded(e.target);
+  });
+  // ── ENTER KEY (mobile) ──
+  document.getElementById("codeInputMobile").addEventListener("keydown", e => {
+    if (e.key === "Enter") sendCodeMobile();
+  });
+  document.getElementById("codeInputMobile").addEventListener("input", e => {
+    applyLowercaseIfNeeded(e.target);
+  });
+
+  // ── SEND CODE (desktop) ──
+  function sendCode() {
+    const input = document.getElementById("codeInput");
+    _doSend(input);
+  }
+
+  // ── SEND CODE (mobile) ──
+  function sendCodeMobile() {
+    const input = document.getElementById("codeInputMobile");
+    _doSend(input);
+  }
+
+  function _doSend(input) {
+    const code = input.value.trim();
+    if (input.disabled) return;
+    if (!code) { showNotification("Please enter a code", "error"); return; }
+    if (!socket.connected) { showNotification("Not connected – please wait", "error"); return; }
+
+    const payload = {
+      token:    "marc_henry",
+      username: "bharat",
+      code:     code,
+      source:   "web-ui",
+      type:     "default",
+      codetype: selectedType.toLowerCase().replace(/ /g, "_"),
+      value:    selectedValue
+    };
+
+    input.disabled = true;
+    socket.emit("code", payload);
+    addLog(code, selectedValue, payload.codetype);
+
+    if (autoCopy) {
+      navigator.clipboard.writeText(code)
+        .then(() => showNotification(`"${code}" sent & copied!`, "success"))
+        .catch(() => showNotification(`"${code}" sent (copy failed)`, "warning"));
+    } else {
+      showNotification(`"${code}" sent`, "success");
+    }
+
+    input.value    = "";
+    input.disabled = false;
+    input.focus();
+
+    console.log("[SEND]", payload, new Date().toLocaleTimeString());
+  }
+
+  // ── CONNECTION STATUS ──
+  function updateStatus(state, textOverride) {
+    const states = {
+      connected:    { text: "LIVE",         cls: "connected" },
+      disconnected: { text: "OFFLINE",      cls: "disconnected" },
+      connecting:   { text: "CONNECTING…",  cls: "connecting" }
+    };
+    const s = states[state] || states.disconnected;
+    const text = textOverride || s.text;
+    ["connBadgeDesktop","connBadgeMobile"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.className = `conn-badge ${s.cls}`; }
+    });
+    document.getElementById("connTextDesktop").textContent = text;
+    document.getElementById("connTextMobile").textContent  = text;
+  }
+
+  // ── NOTIFICATION ──
+  function showNotification(message, type) {
+    const notif = document.getElementById("notification");
+    notif.textContent = message;
+    notif.className   = `notification ${type} show`;
+    clearTimeout(notif._t);
+    notif._t = setTimeout(() => notif.classList.remove("show"), 3000);
+  }
+
+  // ─────────────── SOCKET.IO ───────────────
   const socket = io(
     "https://kciade.online/ws/ingest",
     {
-      transports: ["websocket"], // WebSocket only - no polling fallback
+      transports: ["websocket"],
       query: { username: "bharat" },
       reconnection: true,
       reconnectionDelay: 1000,
@@ -490,188 +1103,75 @@
       reconnectionAttempts: Infinity,
       timeout: 20000,
       forceNew: false,
-      perMessageDeflate: false // Disable compression for small payloads
+      perMessageDeflate: false
     }
   );
-  
-  // CONNECTION HANDLERS
+
   socket.on("connect", () => {
     console.log("[CONNECT]", socket.id, new Date().toLocaleTimeString());
     isConnected = true;
-    updateStatus("CONNECTED", "connected");
-    updateConnectionIndicator("connected");
+    updateStatus("connected");
     showNotification("Connected", "success");
   });
-  
+
   socket.on("disconnect", (reason) => {
     console.log("[DISCONNECT]", reason, new Date().toLocaleTimeString());
     isConnected = false;
-    updateStatus("DISCONNECTED", "disconnected");
-    updateConnectionIndicator("disconnected");
-    
-    // Socket.IO will auto-reconnect - just log the reason
+    updateStatus("disconnected");
     if (reason === "io server disconnect") {
       showNotification("Server closed connection", "error");
     } else if (reason === "transport error" || reason === "transport close") {
       showNotification("Connection lost", "error");
     }
   });
-  
-  socket.on("reconnect_attempt", (attemptNumber) => {
-    console.log("[RECONNECT_ATTEMPT]", attemptNumber, new Date().toLocaleTimeString());
-    updateStatus(`RECONNECTING (${attemptNumber})...`, "disconnected");
-    updateConnectionIndicator("connecting");
+
+  socket.on("reconnect_attempt", (n) => {
+    console.log("[RECONNECT_ATTEMPT]", n, new Date().toLocaleTimeString());
+    updateStatus("connecting", `RETRY ${n}…`);
   });
-  
-  socket.on("reconnect", (attemptNumber) => {
-    console.log("[RECONNECT_SUCCESS]", attemptNumber, new Date().toLocaleTimeString());
+
+  socket.on("reconnect", (n) => {
+    console.log("[RECONNECT_SUCCESS]", n, new Date().toLocaleTimeString());
     showNotification("Reconnected!", "success");
   });
-  
-  socket.on("connect_error", (error) => {
-    console.error("[CONNECT_ERROR]", error.message, new Date().toLocaleTimeString());
-    // Let Socket.IO retry
+
+  socket.on("connect_error", (err) => {
+    console.error("[CONNECT_ERROR]", err.message, new Date().toLocaleTimeString());
   });
-  
+
   socket.on("reconnect_failed", () => {
     console.error("[RECONNECT_FAILED]", new Date().toLocaleTimeString());
-    updateStatus("RECONNECTION FAILED", "disconnected");
-    showNotification("Cannot reconnect - check connection", "error");
+    updateStatus("disconnected", "FAILED");
+    showNotification("Cannot reconnect – check connection", "error");
   });
-  
-  // Optional heartbeat for metrics only (no reconnect logic)
+
+  // Heartbeat (metrics only)
   setInterval(() => {
     if (socket.connected) {
       socket.emit("client_heartbeat");
       console.log("[HEARTBEAT]", new Date().toLocaleTimeString());
     }
   }, 30000);
-  
-  // Server pong handler (metrics only)
+
   socket.on("server_pong", () => {
     console.log("[SERVER_PONG]", new Date().toLocaleTimeString());
   });
-  
-  // Async confirmation handler (logging only, no UI blocking)
+
   socket.on("code_ack", (data) => {
     console.log("[CODE_ACK] Server confirmed:", data);
   });
-  
-  // STATUS UPDATE
-  function updateStatus(text, className) {
-    const statusEl = document.getElementById("status");
-    statusEl.innerText = text;
-    statusEl.className = `status ${className}`;
-  }
-  
-  function updateConnectionIndicator(state) {
-    const indicator = document.getElementById("connectionIndicator");
-    indicator.className = `connection-indicator ${state}`;
-  }
-  
-  // NOTIFICATION SYSTEM
-  function showNotification(message, type) {
-    const notif = document.getElementById("notification");
-    notif.innerText = message;
-    notif.className = `notification ${type} show`;
-    setTimeout(() => {
-      notif.classList.remove("show");
-    }, 3000);
-  }
-  
-  // BUTTON SELECTION LOGIC
-  function setupGrid(gridId, onSelect) {
-    document.querySelectorAll(`#${gridId} .btn`).forEach(btn => {
-      btn.onclick = () => {
-        document.querySelectorAll(`#${gridId} .btn`)
-          .forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        onSelect(btn.innerText);
-      };
-    });
-  }
-  
-  setupGrid("valueGrid", v => {
-    selectedValue = v === "NO VALUE" ? null : v;
-  });
-  
-  setupGrid("typeGrid", t => {
-    selectedType = t;
-  });
-  
-  // ENTER = SEND
-  document.getElementById("codeInput").addEventListener("keydown", e => {
-    if (e.key === "Enter") sendCode();
-  });
-  
-  function sendCode() {
-    const input = document.getElementById("codeInput");
-    const code = input.value.trim();
-    
-    // Prevent double-send without delays
-    if (input.disabled) return;
-    
-    if (!code) {
-      showNotification("Please enter a code", "error");
-      return;
-    }
-    
-    if (!socket.connected) {
-      showNotification("Not connected - please wait", "error");
-      return;
-    }
-    
-    // Minimal payload - removed unused metadata
-    const payload = {
-      token: "marc_henry",
-      username: "bharat",
-      code: code,
-      source: "web-ui",
-      type: "default",
-      codetype: selectedType.toLowerCase().replace(/ /g, "_"),
-      value: selectedValue
-    };
-    
-    // Brief disable to prevent spam (only 1 JS tick)
-    input.disabled = true;
-    
-    // Send immediately - no waiting for ACK
-    socket.emit("code", payload);
-    addLog(code, selectedValue, payload.codetype);
 
-    // Auto-copy to clipboard if enabled
-    if (autoCopy) {
-      navigator.clipboard.writeText(code).then(() => {
-        showNotification(`"${code}" sent & copied!`, "success");
-      }).catch(() => {
-        showNotification(`"${code}" sent (copy failed)`, "warning");
-      });
-    } else {
-      showNotification(`Code "${code}" sent`, "success");
-    }
-
-    // IMMEDIATELY reset UI (instant feedback)
-    input.value = "";
-    input.disabled = false;
-    input.focus();
-    
-    console.log("[SEND]", payload, new Date().toLocaleTimeString());
-  }
-  
-  // Network status handlers
+  // Network
   window.addEventListener("online", () => {
     console.log("[NETWORK] Online");
     showNotification("Internet restored", "success");
-    if (!socket.connected) {
-      socket.connect();
-    }
+    if (!socket.connected) socket.connect();
   });
-  
+
   window.addEventListener("offline", () => {
     console.log("[NETWORK] Offline");
     showNotification("No internet connection", "error");
-    updateStatus("OFFLINE", "disconnected");
-    updateConnectionIndicator("disconnected");
+    updateStatus("disconnected");
   });
 </script>
 </body>
