@@ -698,6 +698,90 @@
     @media (max-width: 480px) {
       .grid { grid-template-columns: repeat(3, 1fr); gap: 5px; }
     }
+
+    /* ─── VALUE INPUT ─── */
+    .value-input-row {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+    }
+    .value-input-wrap {
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .value-prefix {
+      position: absolute;
+      left: 14px;
+      font-family: 'Space Mono', monospace;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-muted);
+      pointer-events: none;
+      transition: color 0.2s;
+      z-index: 1;
+    }
+    .value-input {
+      width: 100%;
+      padding: 13px 14px 13px 30px;
+      background: var(--surface2);
+      border: 1.5px solid var(--border-mid);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 15px;
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      letter-spacing: 1px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      -webkit-appearance: none;
+    }
+    .value-input::placeholder {
+      color: var(--text-muted);
+      font-weight: 400;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+    .value-input:focus {
+      border-color: rgba(0,229,122,0.4);
+      box-shadow: 0 0 0 3px rgba(0,229,122,0.07), 0 0 20px rgba(0,229,122,0.04);
+    }
+    .value-input-wrap:focus-within .value-prefix { color: var(--green); }
+    .null-btn {
+      padding: 0 20px;
+      background: var(--surface2);
+      border: 1.5px solid var(--border-mid);
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 700;
+      font-family: 'Space Mono', monospace;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+      text-transform: uppercase;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .null-btn:hover {
+      border-color: rgba(255,77,106,0.4);
+      color: var(--red);
+      background: rgba(255,77,106,0.06);
+    }
+    .null-btn.active {
+      border-color: rgba(255,77,106,0.45);
+      color: var(--red);
+      background: rgba(255,77,106,0.1);
+      box-shadow: 0 0 0 3px rgba(255,77,106,0.05);
+    }
+
+    @media (max-width: 720px) {
+      .value-input { padding: 11px 14px 11px 28px; font-size: 14px; }
+      .value-prefix { font-size: 14px; }
+      .null-btn { padding: 0 16px; font-size: 9px; letter-spacing: 1.5px; }
+    }
   </style>
 </head>
 <body>
@@ -752,18 +836,13 @@
 
     <!-- VALUE CARD -->
     <div class="card">
-      <span class="section-label">Select Value</span>
-      <div class="grid" id="valueGrid">
-        <div class="btn">$1</div>
-        <div class="btn">$2</div>
-        <div class="btn">$3</div>
-        <div class="btn">$4</div>
-        <div class="btn">$5</div>
-        <div class="btn">$6.25</div>
-        <div class="btn">$12.50</div>
-        <div class="btn">$25</div>
-        <div class="btn">$50</div>
-        <div class="btn full active">NO VALUE</div>
+      <span class="section-label">Code Value</span>
+      <div class="value-input-row">
+        <div class="value-input-wrap">
+          <span class="value-prefix">$</span>
+          <input id="valueInput" class="value-input" type="text" inputmode="decimal" placeholder="Enter amount…" autocomplete="off" autocorrect="off" spellcheck="false" oninput="handleValueInput(this)" />
+        </div>
+        <button class="null-btn active" id="nullBtn" onclick="setNullValue()">NULL</button>
       </div>
     </div>
 
@@ -848,18 +927,13 @@
 
       <!-- VALUE -->
       <div class="card">
-        <span class="section-label">Select Value</span>
-        <div class="grid" id="valueGridMobile">
-          <div class="btn">$1</div>
-          <div class="btn">$2</div>
-          <div class="btn">$3</div>
-          <div class="btn">$4</div>
-          <div class="btn">$5</div>
-          <div class="btn">$6.25</div>
-          <div class="btn">$12.50</div>
-          <div class="btn">$25</div>
-          <div class="btn">$50</div>
-          <div class="btn full active">NO VALUE</div>
+        <span class="section-label">Code Value</span>
+        <div class="value-input-row">
+          <div class="value-input-wrap">
+            <span class="value-prefix">$</span>
+            <input id="valueInputMobile" class="value-input" type="text" inputmode="decimal" placeholder="Enter amount…" autocomplete="off" autocorrect="off" spellcheck="false" oninput="handleValueInput(this)" />
+          </div>
+          <button class="null-btn active" id="nullBtnMobile" onclick="setNullValue()">NULL</button>
         </div>
       </div>
 
@@ -1070,8 +1144,33 @@
     });
   }
 
-  setupGrid("valueGrid",       v => { selectedValue = v === "NO VALUE" ? null : v; });
-  setupGrid("valueGridMobile", v => { selectedValue = v === "NO VALUE" ? null : v; });
+  setupGrid("valueGrid",       v => {});      // kept for safety — value now uses manual input
+  setupGrid("valueGridMobile", v => {});      // kept for safety — value now uses manual input
+
+  // ── VALUE INPUT ──
+  function handleValueInput(input) {
+    const val = input.value.trim();
+    selectedValue = val ? "$" + val : null;
+    // Sync the other input
+    const otherId = input.id === "valueInput" ? "valueInputMobile" : "valueInput";
+    document.getElementById(otherId).value = input.value;
+    // Remove null active state when typing
+    if (val) {
+      document.getElementById("nullBtn").classList.remove("active");
+      document.getElementById("nullBtnMobile").classList.remove("active");
+    } else {
+      document.getElementById("nullBtn").classList.add("active");
+      document.getElementById("nullBtnMobile").classList.add("active");
+    }
+  }
+
+  function setNullValue() {
+    selectedValue = null;
+    document.getElementById("valueInput").value        = "";
+    document.getElementById("valueInputMobile").value  = "";
+    document.getElementById("nullBtn").classList.add("active");
+    document.getElementById("nullBtnMobile").classList.add("active");
+  }
   setupTypeGrid("typeGrid",       t => { selectedType = t; });
   setupTypeGrid("typeGridMobile", t => { selectedType = t; });
 
