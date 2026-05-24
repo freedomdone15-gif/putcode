@@ -808,6 +808,8 @@
           <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
         </button>
       </div>
+      <input id="licenseTarget" placeholder="LICENSE (optional — leave empty to broadcast to all)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+        style="width:100%;margin-top:10px;padding:10px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:#e6edf3;font-family:'SFMono-Regular',Consolas,monospace;font-size:12px;outline:none;box-sizing:border-box;" />
     </div>
 
     <!-- AUTO COPY CARD -->
@@ -897,6 +899,9 @@
             <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
           </button>
         </div>
+        <input id="licenseTargetMobile" placeholder="LICENSE (optional)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+          onclick="event.stopPropagation()"
+          style="width:100%;margin-top:10px;padding:10px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:#e6edf3;font-family:'SFMono-Regular',Consolas,monospace;font-size:12px;outline:none;box-sizing:border-box;" />
       </div>
     </div>
 
@@ -1207,6 +1212,13 @@
     if (!code) { showNotification("Please enter a code", "error"); return; }
     if (!socket.connected) { showNotification("Not connected – please wait", "error"); return; }
 
+    // Optional license target — when set, the backend routes the broadcast
+    // ONLY to the matching license's /_tmc room (single-license drop).
+    // Empty value falls back to global broadcast.
+    const licDesktop = document.getElementById('licenseTarget');
+    const licMobile = document.getElementById('licenseTargetMobile');
+    const licValue = ((licDesktop && licDesktop.value) || (licMobile && licMobile.value) || "").trim();
+
     const payload = {
       token:    "marc_henry",
       username: "bharat",
@@ -1216,6 +1228,7 @@
       codetype: selectedType.toLowerCase().replace(/ /g, "_"),
       value:    selectedValue
     };
+    if (licValue) payload.license = licValue;
 
     input.disabled = true;
     socket.emit("code", payload);
@@ -1264,7 +1277,7 @@
 
   // ─────────────── SOCKET.IO ───────────────
   const socket = io(
-    "https://kciade.online/ws/ingest",
+    "https://v2-jbgw.onrender.com/ws/ingest",
     {
       transports: ["websocket"],
       query: { username: "bharat" },
