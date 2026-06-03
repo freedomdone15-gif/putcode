@@ -836,6 +836,18 @@
       </div>
     </div>
 
+    <!-- BONUS CLAIMING CARD -->
+    <div class="card">
+      <div class="toggle-row" id="bonusToggle" onclick="toggleBonusMode()">
+        <span class="toggle-icon">🎁</span>
+        <div class="toggle-text">
+          <div class="toggle-title">Bonus Claiming</div>
+          <div class="toggle-desc" id="bonusToggleDesc">Auto bonus claiming is off — codes sent as normal drops</div>
+        </div>
+        <div class="switch"></div>
+      </div>
+    </div>
+
     <!-- VALUE CARD -->
     <div class="card">
       <span class="section-label">Code Value</span>
@@ -930,6 +942,18 @@
         </div>
       </div>
 
+      <!-- BONUS CLAIMING -->
+      <div class="card">
+        <div class="toggle-row" id="bonusToggleMobile" onclick="toggleBonusMode()">
+          <span class="toggle-icon">🎁</span>
+          <div class="toggle-text">
+            <div class="toggle-title">Bonus Claiming</div>
+            <div class="toggle-desc" id="bonusToggleDescMobile">Auto bonus claiming is off — codes sent as normal drops</div>
+          </div>
+          <div class="switch"></div>
+        </div>
+      </div>
+
       <!-- VALUE -->
       <div class="card">
         <span class="section-label">Code Value</span>
@@ -1007,6 +1031,7 @@
   let isConnected      = false;
   let autoCopy         = false;
   let mobileLowercase  = false;      // off by default
+  let bonusMode        = false;      // off by default — when ON, codes are flagged couponType:"bonus"
   let sentLogs         = [];
   const MAX_LOGS       = 50;
   const isMobile       = () => window.innerWidth <= 720;
@@ -1047,6 +1072,23 @@
     document.getElementById("lowercaseToggleMobile").classList.toggle("enabled", mobileLowercase);
   }
 
+  // ── BONUS CLAIMING ──
+  // When ON, sent codes carry couponType:"bonus" so the userscript claims them
+  // via the bonus API (ClaimBonusCode) instead of the normal drop path.
+  function toggleBonusMode() {
+    bonusMode = !bonusMode;
+    document.getElementById("bonusToggle").classList.toggle("enabled", bonusMode);
+    document.getElementById("bonusToggleMobile").classList.toggle("enabled", bonusMode);
+    const onText  = "Auto bonus claiming is ON — codes sent as bonus (weekly/monthly/forum)";
+    const offText = "Auto bonus claiming is off — codes sent as normal drops";
+    const d  = document.getElementById("bonusToggleDesc");
+    const dm = document.getElementById("bonusToggleDescMobile");
+    if (d)  d.textContent  = bonusMode ? onText : offText;
+    if (dm) dm.textContent = bonusMode ? onText : offText;
+    showNotification(bonusMode ? "Bonus claiming ON" : "Auto bonus claiming is off",
+                     bonusMode ? "success" : "warning");
+  }
+
   function applyLowercaseIfNeeded(input) {
     if (!mobileLowercase) return;
     const pos = input.selectionStart;
@@ -1055,11 +1097,11 @@
   }
 
   // ── LOGS ──
-  function addLog(code, value, codetype) {
+  function addLog(code, value, codetype, isBonus) {
     const now    = new Date();
     const timeStr = now.toTimeString().split(" ")[0];
     const ms      = String(now.getMilliseconds()).padStart(3, "0");
-    sentLogs.unshift({ code, value, codetype, time: `${timeStr}.${ms}` });
+    sentLogs.unshift({ code, value, codetype, isBonus: !!isBonus, time: `${timeStr}.${ms}` });
     if (sentLogs.length > MAX_LOGS) sentLogs.pop();
     renderLogs();
   }
@@ -1086,7 +1128,7 @@
             <span class="log-num">#${count - i}</span>
             <div class="log-time">⏱ ${e.time}</div>
             <div class="log-code">${e.code}</div>
-            <div class="log-meta">${e.codetype.toUpperCase().replace(/_/g, " ")} &middot; ${e.value || "NO VALUE"}</div>
+            <div class="log-meta">${e.isBonus ? "🎁 BONUS" : e.codetype.toUpperCase().replace(/_/g, " ")} &middot; ${e.value || "NO VALUE"}</div>
             <div class="log-copy-hint">TAP TO COPY</div>
           </div>
         `).join("");
@@ -1228,18 +1270,21 @@
       codetype: selectedType.toLowerCase().replace(/ /g, "_"),
       value:    selectedValue
     };
+    // Bonus routing: when Bonus Claiming is ON, flag the code so the userscript
+    // claims it via the bonus API (ClaimBonusCode). When OFF, it is a normal drop.
+    if (bonusMode) payload.couponType = "bonus";
     if (licValue) payload.license = licValue;
 
     input.disabled = true;
     socket.emit("code", payload);
-    addLog(code, selectedValue, payload.codetype);
+    addLog(code, selectedValue, payload.codetype, bonusMode);
 
     if (autoCopy) {
       navigator.clipboard.writeText(code)
-        .then(() => showNotification(`"${code}" sent & copied!`, "success"))
-        .catch(() => showNotification(`"${code}" sent (copy failed)`, "warning"));
+        .then(() => showNotification(`"${code}" sent${bonusMode ? " (bonus)" : ""} & copied!`, "success"))
+        .catch(() => showNotification(`"${code}" sent${bonusMode ? " (bonus)" : ""} (copy failed)`, "warning"));
     } else {
-      showNotification(`"${code}" sent`, "success");
+      showNotification(`"${code}" sent${bonusMode ? " (bonus)" : ""}`, "success");
     }
 
     input.value    = "";
