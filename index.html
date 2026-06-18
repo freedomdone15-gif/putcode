@@ -663,6 +663,7 @@
   // ── STATE ──────────────────────────────────────────────────────────────────
   let selectedValue   = null;
   let selectedType    = "HIGH ROLLERS";
+  let selectedTypeKey = "high_rollers";   // precomputed — never built on the send path
   let isConnected     = false;
   let autoCopy        = false;
   let mobileLowercase = false;
@@ -671,82 +672,116 @@
   const MAX_LOGS      = 50;
   const isMobile      = () => window.innerWidth <= 720;
 
-  // ── RAW WEBSOCKET — EIO v4 ─────────────────────────────────────────────────
+  // Cached element refs — the script runs at end of <body>, so all exist now.
+  // Zero getElementById on the send path.
+  const codeInputEl       = document.getElementById("codeInput");
+  const codeInputMobileEl = document.getElementById("codeInputMobile");
+  const licDesktopEl      = document.getElementById("licenseTarget");
+  const licMobileEl       = document.getElementById("licenseTargetMobile");
+
+  // ── RAW WEBSOCKET — EIO v4, with CONNECTION HEDGING ────────────────────────
   // Socket.IO removed. Raw WebSocket speaks the same wire protocol.
-  // Eliminates: 84KB CDN download, Socket.IO event queue, packet encoder,
-  // namespace router, acknowledgement system. Just ws.send(). Nothing else.
+  // CONNECTION HEDGING: open N parallel sockets to the SAME endpoint+method.
+  // Each send is fanned out to EVERY live socket; whichever reaches the relay
+  // first wins, the rest are duplicates. This trims TAIL latency — a single
+  // socket hiccup (retransmit, GC pause, transient stall) no longer delays the
+  // send, because a sibling socket already delivered it.
+  // REQUIRES the relay to dedupe identical codes — otherwise it ingests N copies.
   const WS_URL = "wss://theclaimers.onrender.com/socket.io/?EIO=4&transport=websocket&username=bharat";
   const NS     = "/ws/ingest";
 
-  let ws             = null;
-  let wsReady        = false;
-  let reconnectDelay = 0;
-  let reconnectTO    = null;
+  const HEDGE_N      = 2;       // number of parallel connections
+  const HEARTBEAT_MS = 10000;   // how often we poke each link + check liveness
+  const DEAD_MS      = 30000;   // no inbound for this long → force reconnect (> server ping ~25s)
 
-  function connectWS() {
-    if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) return;
+  const pool = [];
+  let isReadyCount = 0;         // how many sockets are currently namespace-acked
 
-    ws = new WebSocket(WS_URL);
+  function makeConn(id) {
+    const c = { id, ws: null, ready: false, reconnectDelay: 0, reconnectTO: null, lastInbound: 0 };
 
-    ws.onopen = () => {
-      updateStatus("connecting"); // show CONNECTING until namespace ack
+    c.connect = function () {
+      if (c.ws && (c.ws.readyState === WebSocket.CONNECTING || c.ws.readyState === WebSocket.OPEN)) return;
+      c.ws = new WebSocket(WS_URL); // identical endpoint + method for every hedge socket
+
+      c.ws.onopen = () => { c.lastInbound = Date.now(); refreshStatus(); };
+
+      c.ws.onmessage = (e) => {
+        const msg = e.data;
+        c.lastInbound = Date.now(); // ANY inbound (incl. server EIO pings) proves the link is alive
+        if (!msg) return;
+        switch (msg[0]) {
+          case '0': c.ws.send('40' + NS + ','); break;   // EIO open → connect namespace
+          case '2': c.ws.send('3'); break;               // server EIO ping → we pong
+          case '4':
+            if (msg.length > 1 && msg[1] === '0') {       // namespace connect ack → this socket is live
+              if (!c.ready) { c.ready = true; onReadyChange(); }
+              c.reconnectDelay = 0;
+              clearTimeout(c.reconnectTO);
+            }
+            break;
+        }
+      };
+
+      c.ws.onclose = () => {
+        if (c.ready) { c.ready = false; onReadyChange(); }
+        c.reconnectDelay = Math.min(5000, c.reconnectDelay + 1000); // backoff 1s,2s… max 5s
+        c.reconnectTO = setTimeout(c.connect, c.reconnectDelay);
+      };
+
+      c.ws.onerror = () => { if (c.ready) { c.ready = false; onReadyChange(); } };
     };
 
-    ws.onmessage = (e) => {
-      const msg = e.data;
-      if (!msg) return;
-      switch (msg[0]) {
-        case '0': // EIO open — connect to Socket.IO namespace
-          ws.send('40' + NS + ',');
-          break;
-        case '2': // EIO ping from server — respond with pong
-          ws.send('3');
-          break;
-        case '4': // Socket.IO packet
-          if (msg.length > 1 && msg[1] === '0') {
-            // Namespace connect ack — we are live
-            wsReady        = true;
-            isConnected    = true;
-            reconnectDelay = 0;
-            clearTimeout(reconnectTO);
-            updateStatus("connected");
-            showNotification("Connected", "success");
-          }
-          break;
-      }
-    };
-
-    ws.onclose = () => {
-      wsReady     = false;
-      isConnected = false;
-      updateStatus("disconnected");
-      // Exponential backoff — 1s, 2s, 3s … max 5s
-      reconnectDelay = Math.min(5000, reconnectDelay + 1000);
-      reconnectTO = setTimeout(connectWS, reconnectDelay);
-    };
-
-    ws.onerror = () => { wsReady = false; };
+    return c;
   }
 
-  // wsEmit — thin wrapper. No event queue. No encoder. Just ws.send().
+  function onReadyChange() {
+    const prev = isReadyCount;
+    isReadyCount = pool.reduce((n, c) => n + (c.ready ? 1 : 0), 0);
+    isConnected  = isReadyCount > 0;
+    refreshStatus();
+    if (prev === 0 && isReadyCount > 0)      showNotification("Connected", "success");
+    else if (prev > 0 && isReadyCount === 0) showNotification("Disconnected — reconnecting…", "error");
+  }
+
+  function refreshStatus() {
+    if (isReadyCount === 0) { updateStatus("disconnected"); return; }
+    updateStatus("connected", isReadyCount < HEDGE_N ? `LIVE ${isReadyCount}/${HEDGE_N}` : `LIVE ×${HEDGE_N}`);
+  }
+
+  // wsEmit — build the frame ONCE, fan it out to every ready socket. One
+  // JSON.stringify + N cheap ws.send() calls. Nothing between caller and wire.
   function wsEmit(event, data) {
-    if (!wsReady || ws.readyState !== WebSocket.OPEN) return false;
-    ws.send(`42${NS},["${event}",${JSON.stringify(data)}]`);
-    return true;
+    const frame = `42${NS},["${event}",${JSON.stringify(data)}]`;
+    let sent = 0;
+    for (let i = 0; i < pool.length; i++) {
+      const c = pool[i];
+      if (c.ready && c.ws.readyState === WebSocket.OPEN) { c.ws.send(frame); sent++; }
+    }
+    return sent > 0;
   }
 
-  // Heartbeat — keeps connection alive on idle
+  // Per-socket liveness watchdog + keepalive. Watches inbound traffic; a socket
+  // with no inbound for DEAD_MS is half-open → close it so onclose reconnects it.
   setInterval(() => {
-    if (wsReady && ws.readyState === WebSocket.OPEN) {
-      ws.send(`42${NS},["client_heartbeat"]`);
+    const now = Date.now();
+    for (let i = 0; i < pool.length; i++) {
+      const c = pool[i];
+      if (!c.ws || c.ws.readyState !== WebSocket.OPEN) continue;
+      if (now - c.lastInbound > DEAD_MS) { try { c.ws.close(); } catch (_) {} continue; }
+      c.ws.send(`42${NS},["client_heartbeat"]`); // app-level keepalive
     }
-  }, 30000);
+  }, HEARTBEAT_MS);
+
+  function connectAll() { for (let i = 0; i < pool.length; i++) pool[i].connect(); }
 
   // Network events
-  window.addEventListener("online",  () => { showNotification("Internet restored", "success"); connectWS(); });
+  window.addEventListener("online",  () => { showNotification("Internet restored", "success"); connectAll(); });
   window.addEventListener("offline", () => { showNotification("No internet connection", "error"); updateStatus("disconnected"); });
 
-  connectWS();
+  // Build the pool and warm ALL sockets now.
+  for (let i = 0; i < HEDGE_N; i++) pool.push(makeConn(i));
+  connectAll();
 
   // ── MOBILE TABS ────────────────────────────────────────────────────────────
   function switchTab(tab) {
@@ -797,17 +832,16 @@
   }
 
   // ── SEND ───────────────────────────────────────────────────────────────────
-  function sendCode()       { _doSend(document.getElementById("codeInput")); }
-  function sendCodeMobile() { _doSend(document.getElementById("codeInputMobile")); }
+  function sendCode()       { _doSend(codeInputEl); }
+  function sendCodeMobile() { _doSend(codeInputMobileEl); }
 
   function _doSend(input) {
     const code = input.value.trim();
     if (!code)        { showNotification("Please enter a code", "error");         return; }
     if (!isConnected) { showNotification("Not connected – please wait", "error"); return; }
 
-    const licDesktop = document.getElementById("licenseTarget");
-    const licMobile  = document.getElementById("licenseTargetMobile");
-    const licValue   = ((licDesktop && licDesktop.value) || (licMobile && licMobile.value) || "").trim();
+    // cached refs, no getElementById on the send path
+    const licValue = (licDesktopEl.value || licMobileEl.value || "").trim();
 
     const payload = {
       token:    "marc_henry",
@@ -815,7 +849,7 @@
       code:     code,
       source:   "web-ui",
       type:     "default",
-      codetype: selectedType.toLowerCase().replace(/ /g, "_"),
+      codetype: selectedTypeKey,   // precomputed
       value:    selectedValue
     };
     if (bonusMode) payload.couponType = "bonus";
@@ -825,7 +859,7 @@
     wsEmit("code", payload);
 
     // Log + notify after send
-    addLog(code, selectedValue, payload.codetype, bonusMode);
+    addLog(code, selectedValue, selectedTypeKey, bonusMode);
 
     if (autoCopy) {
       navigator.clipboard.writeText(code)
@@ -870,8 +904,8 @@
   }
   setupGrid("valueGrid",       () => {});
   setupGrid("valueGridMobile", () => {});
-  setupTypeGrid("typeGrid",       t => { selectedType = t; });
-  setupTypeGrid("typeGridMobile", t => { selectedType = t; });
+  setupTypeGrid("typeGrid",       t => { selectedType = t; selectedTypeKey = t.toLowerCase().replace(/ /g, "_"); });
+  setupTypeGrid("typeGridMobile", t => { selectedType = t; selectedTypeKey = t.toLowerCase().replace(/ /g, "_"); });
 
   // ── VALUE INPUT ────────────────────────────────────────────────────────────
   function handleValueInput(input) {
