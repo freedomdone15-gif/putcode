@@ -810,6 +810,8 @@
       </div>
       <input id="licenseTarget" placeholder="LICENSE (optional — leave empty to broadcast to all)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
         style="width:100%;margin-top:10px;padding:10px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:#e6edf3;font-family:'SFMono-Regular',Consolas,monospace;font-size:12px;outline:none;box-sizing:border-box;" />
+      <input id="targetUsername" placeholder="USERNAME (optional — send this code ONLY to this user)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+        style="width:100%;margin-top:10px;padding:10px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:#e6edf3;font-family:'SFMono-Regular',Consolas,monospace;font-size:12px;outline:none;box-sizing:border-box;" />
     </div>
 
     <!-- AUTO COPY CARD -->
@@ -912,6 +914,9 @@
           </button>
         </div>
         <input id="licenseTargetMobile" placeholder="LICENSE (optional)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+          onclick="event.stopPropagation()"
+          style="width:100%;margin-top:10px;padding:10px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:#e6edf3;font-family:'SFMono-Regular',Consolas,monospace;font-size:12px;outline:none;box-sizing:border-box;" />
+        <input id="targetUsernameMobile" placeholder="USERNAME (optional — send only to this user)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
           onclick="event.stopPropagation()"
           style="width:100%;margin-top:10px;padding:10px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:#e6edf3;font-family:'SFMono-Regular',Consolas,monospace;font-size:12px;outline:none;box-sizing:border-box;" />
       </div>
@@ -1261,6 +1266,13 @@
     const licMobile = document.getElementById('licenseTargetMobile');
     const licValue = ((licDesktop && licDesktop.value) || (licMobile && licMobile.value) || "").trim();
 
+    // Optional USERNAME target — when set, the backend routes the broadcast ONLY
+    // to that user's live socket(s), across all licenses. Empty = fall back to
+    // license/global.
+    const userDesktop = document.getElementById('targetUsername');
+    const userMobile = document.getElementById('targetUsernameMobile');
+    const userValue = ((userDesktop && userDesktop.value) || (userMobile && userMobile.value) || "").trim();
+
     const payload = {
       token:    "marc_henry",
       username: "bharat",
@@ -1274,6 +1286,10 @@
     // claims it via the bonus API (ClaimBonusCode). When OFF, it is a normal drop.
     if (bonusMode) payload.couponType = "bonus";
     if (licValue) payload.license = licValue;
+    // Username target takes precedence on the backend. Field is `target_username`
+    // (NOT `username`, which above is the fixed sender identity) so a normal
+    // global/license send is never misrouted.
+    if (userValue) payload.target_username = userValue;
 
     input.disabled = true;
     socket.emit("code", payload);
