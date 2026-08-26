@@ -4,6 +4,8 @@
   <title>Code Drop</title>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Warm the second backend's TLS/connection early so the parallel socket connects fast. -->
+  <link rel="preconnect" href="https://apiclaimers.onrender.com">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
@@ -797,6 +799,10 @@
         <div class="conn-dot"></div>
         <span id="connTextDesktop">CONNECTING</span>
       </div>
+      <div class="conn-badge disconnected" id="connBadgeClaimer">
+        <div class="conn-dot"></div>
+        <span id="connTextClaimer">API …</span>
+      </div>
     </div>
 
     <!-- INPUT CARD -->
@@ -902,6 +908,10 @@
         <div class="conn-badge disconnected" id="connBadgeMobile">
           <div class="conn-dot"></div>
           <span id="connTextMobile">CONNECTING</span>
+        </div>
+        <div class="conn-badge disconnected" id="connBadgeClaimerMobile">
+          <div class="conn-dot"></div>
+          <span id="connTextClaimerMobile">API …</span>
         </div>
       </div>
       <!-- INPUT — tap anywhere on card to focus -->
@@ -1253,11 +1263,25 @@
     _doSend(input);
   }
 
+  // Convert the "$"-prefixed value string ("$8", "$1.5") into a plain number for the
+  // API-Claimer backend. Returns null when there's no usable value — caller omits the field.
+  // A "$"-prefixed / string value breaks the per-slot value filter on that backend.
+  function parseAmountToNumber(v) {
+    if (v == null || v === "") return null;
+    const n = parseFloat(String(v).replace(/[^0-9.]/g, ''));  // strips "$", commas
+    return isNaN(n) ? null : n;
+  }
+
   function _doSend(input) {
     const code = input.value.trim();
     if (input.disabled) return;
     if (!code) { showNotification("Please enter a code", "error"); return; }
-    if (!socket.connected) { showNotification("Not connected – please wait", "error"); return; }
+
+    // Independent per-backend gating: one dead backend never blocks the live one.
+    // Only refuse the send when BOTH are down.
+    const mainUp    = socket && socket.connected;
+    const claimerUp = claimerSocket && claimerSocket.connected;
+    if (!mainUp && !claimerUp) { showNotification("Not connected – please wait", "error"); return; }
 
     // Optional license target — when set, the backend routes the broadcast
     // ONLY to the matching license's /_tmc room (single-license drop).
@@ -1291,8 +1315,23 @@
     // global/license send is never misrouted.
     if (userValue) payload.target_username = userValue;
 
+    // ── API-Claimer payload — numeric value, lowercase drop/bonus couponType ──
+    // Separate object so the main payload above stays byte-for-byte unchanged.
+    const claimerPayload = {
+      token:      "marc_henry",
+      code:       code,
+      couponType: bonusMode ? "bonus" : "drop"
+    };
+    const numericValue = parseAmountToNumber(selectedValue);
+    if (numericValue !== null) claimerPayload.value = numericValue;   // omit when no value
+    if (licValue)  claimerPayload.license = licValue;
+    if (userValue) claimerPayload.target_username = userValue;
+
     input.disabled = true;
-    socket.emit("code", payload);
+    // Fire both together — no await between them — so neither backend waits on the
+    // other and both frames leave in the same tick.
+    if (mainUp)    socket.emit("code", payload);
+    if (claimerUp) claimerSocket.emit("code", claimerPayload);
     addLog(code, selectedValue, payload.codetype, bonusMode);
 
     if (autoCopy) {
@@ -1307,7 +1346,7 @@
     input.disabled = false;
     input.focus();
 
-    console.log("[SEND]", payload, new Date().toLocaleTimeString());
+    console.log("[SEND]", { main: payload, claimer: claimerPayload, mainUp, claimerUp }, new Date().toLocaleTimeString());
   }
 
   // ── CONNECTION STATUS ──
@@ -1325,6 +1364,25 @@
     });
     document.getElementById("connTextDesktop").textContent = text;
     document.getElementById("connTextMobile").textContent  = text;
+  }
+
+  // ── API-CLAIMER CONNECTION STATUS ── (mirrors updateStatus, drives the API pill)
+  function updateClaimerStatus(state, textOverride) {
+    const states = {
+      connected:    { text: "API LIVE",    cls: "connected" },
+      disconnected: { text: "API OFFLINE", cls: "disconnected" },
+      connecting:   { text: "API …",       cls: "connecting" }
+    };
+    const s = states[state] || states.disconnected;
+    const text = textOverride || s.text;
+    ["connBadgeClaimer","connBadgeClaimerMobile"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.className = `conn-badge ${s.cls}`; }
+    });
+    const dt = document.getElementById("connTextClaimer");
+    const mt = document.getElementById("connTextClaimerMobile");
+    if (dt) dt.textContent = text;
+    if (mt) mt.textContent = text;
   }
 
   // ── NOTIFICATION ──
@@ -1406,11 +1464,60 @@
     console.log("[CODE_ACK] Server confirmed:", data);
   });
 
+  // ─────────────── SOCKET.IO — API-CLAIMER (parallel backend) ───────────────
+  // Second, independent broadcast destination. No auth/query required for this
+  // endpoint. Options mirror the main socket so reconnect behaviour matches.
+  const CLAIMER_URL = "https://apiclaimers.onrender.com/ws/ingest";
+  const claimerSocket = io(
+    CLAIMER_URL,
+    {
+      transports: ["websocket"],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: Infinity,
+      timeout: 20000,
+      forceNew: false,
+      perMessageDeflate: false
+    }
+  );
+
+  updateClaimerStatus("connecting");
+
+  claimerSocket.on("connect", () => {
+    console.log("[CLAIMER_CONNECT]", claimerSocket.id, new Date().toLocaleTimeString());
+    updateClaimerStatus("connected");
+  });
+
+  claimerSocket.on("disconnect", (reason) => {
+    console.log("[CLAIMER_DISCONNECT]", reason, new Date().toLocaleTimeString());
+    updateClaimerStatus("disconnected");
+  });
+
+  claimerSocket.on("reconnect_attempt", (n) => {
+    console.log("[CLAIMER_RECONNECT_ATTEMPT]", n, new Date().toLocaleTimeString());
+    updateClaimerStatus("connecting", `API RETRY ${n}…`);
+  });
+
+  claimerSocket.on("reconnect", (n) => {
+    console.log("[CLAIMER_RECONNECT_SUCCESS]", n, new Date().toLocaleTimeString());
+  });
+
+  claimerSocket.on("connect_error", (err) => {
+    console.error("[CLAIMER_CONNECT_ERROR]", err.message, new Date().toLocaleTimeString());
+  });
+
+  claimerSocket.on("reconnect_failed", () => {
+    console.error("[CLAIMER_RECONNECT_FAILED]", new Date().toLocaleTimeString());
+    updateClaimerStatus("disconnected", "API FAILED");
+  });
+
   // Network
   window.addEventListener("online", () => {
     console.log("[NETWORK] Online");
     showNotification("Internet restored", "success");
     if (!socket.connected) socket.connect();
+    if (!claimerSocket.connected) claimerSocket.connect();
   });
 
   window.addEventListener("offline", () => {
