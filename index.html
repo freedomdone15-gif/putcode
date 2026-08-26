@@ -1327,11 +1327,17 @@
     if (licValue)  claimerPayload.license = licValue;
     if (userValue) claimerPayload.target_username = userValue;
 
-    input.disabled = true;
-    // Fire both together — no await between them — so neither backend waits on the
-    // other and both frames leave in the same tick.
+    // ── FIRE BOTH EMITS FIRST — the very first side effect, back-to-back in the
+    // same tick with NOTHING between (or before) them. This is the maximum
+    // parallelism single-threaded JS allows: both frames are handed to their
+    // websocket send buffers microseconds apart, in one synchronous tick, so
+    // neither backend is favored. Any larger gap you observe is server-side
+    // (e.g. the API-Claimer on Render cold-starting), not this dispatch.
     if (mainUp)    socket.emit("code", payload);
     if (claimerUp) claimerSocket.emit("code", claimerPayload);
+
+    // ── Post-send bookkeeping — runs AFTER both emits, never delays them ──
+    input.disabled = true;
     addLog(code, selectedValue, payload.codetype, bonusMode);
 
     if (autoCopy) {
